@@ -1,0 +1,262 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ---------- Acesso & Auditoria ----------
+
+model User {
+  id           Int      @id @default(autoincrement())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         String   @default("FUNCIONARIO") // ADMIN | FUNCIONARIO
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  sales         Sale[]
+  purchases     Purchase[]
+  movements     StockMovement[]
+  serviceOrders ServiceOrder[]
+  auditLogs     AuditLog[]
+}
+
+model CompanySettings {
+  id                Int      @id @default(1)
+  name              String   @default("GestãoPro Empresarial Ltda")
+  tradeName         String?  @default("GestãoPro")
+  document          String?  @default("00.000.000/0001-00")
+  stateRegistration String?
+  email             String?  @default("contato@empresa.com.br")
+  phone             String?  @default("(11) 3000-0000")
+  website           String?
+  address           String?  @default("Av. Paulista, 1000 — Bela Vista")
+  city              String?  @default("São Paulo")
+  state             String?  @default("SP")
+  zipCode           String?  @default("01310-100")
+  receiptFooter     String?  @default("Obrigado pela preferência! Guarde este comprovante para garantia.")
+  updatedAt         DateTime @updatedAt
+}
+
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  userId    Int?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userName  String
+  module    String // AUTH | CLIENTES | FORNECEDORES | PRODUTOS | ESTOQUE | VENDAS | COMPRAS | OS | FINANCEIRO | RH | USUARIOS | CONFIG
+  action    String // CRIAR | EDITAR | EXCLUIR | CONFIRMAR | CANCELAR | RECEBER | BAIXAR | LOGIN
+  entityId  String?
+  details   String
+  createdAt DateTime @default(now())
+}
+
+// ---------- Cadastros ----------
+
+model Client {
+  id        Int      @id @default(autoincrement())
+  name      String
+  document  String? // CPF / CNPJ
+  email     String?
+  phone     String?
+  address   String?
+  city      String?
+  state     String?
+  notes     String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  sales         Sale[]
+  serviceOrders ServiceOrder[]
+}
+
+model Supplier {
+  id        Int      @id @default(autoincrement())
+  name      String
+  document  String?
+  email     String?
+  phone     String?
+  address   String?
+  city      String?
+  state     String?
+  notes     String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  products  Product[]
+  purchases Purchase[]
+}
+
+model Product {
+  id          Int       @id @default(autoincrement())
+  sku         String    @unique
+  name        String
+  description String?
+  category    String?
+  unit        String    @default("UN")
+  costPrice   Float     @default(0)
+  salePrice   Float     @default(0)
+  stock       Float     @default(0)
+  minStock    Float     @default(0)
+  active      Boolean   @default(true)
+  supplierId  Int?
+  supplier    Supplier? @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  createdAt   DateTime  @default(now())
+
+  saleItems         SaleItem[]
+  purchaseItems     PurchaseItem[]
+  serviceOrderItems ServiceOrderItem[]
+  movements         StockMovement[]
+}
+
+model Employee {
+  id         Int      @id @default(autoincrement())
+  name       String
+  document   String?
+  email      String?
+  phone      String?
+  position   String
+  department String?
+  salary     Float    @default(0)
+  hireDate   DateTime
+  active     Boolean  @default(true)
+  notes      String?
+  createdAt  DateTime @default(now())
+
+  serviceOrders ServiceOrder[]
+}
+
+// ---------- Movimentações ----------
+
+model Sale {
+  id            Int      @id @default(autoincrement())
+  clientId      Int?
+  client        Client?  @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  userId        Int?
+  user          User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  date          DateTime @default(now())
+  status        String   @default("ORCAMENTO") // ORCAMENTO | CONFIRMADA | CANCELADA
+  paymentMethod String?
+  subtotal      Float    @default(0)
+  discount      Float    @default(0)
+  total         Float    @default(0)
+  notes         String?
+  createdAt     DateTime @default(now())
+
+  items     SaleItem[]
+  financial FinancialEntry[]
+}
+
+model SaleItem {
+  id        Int     @id @default(autoincrement())
+  saleId    Int
+  sale      Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  productId Int
+  product   Product @relation(fields: [productId], references: [id])
+  quantity  Float
+  unitPrice Float
+  total     Float
+}
+
+model Purchase {
+  id         Int       @id @default(autoincrement())
+  supplierId Int?
+  supplier   Supplier? @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  userId     Int?
+  user       User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  date       DateTime  @default(now())
+  dueDate    DateTime?
+  receivedAt DateTime?
+  status     String    @default("PENDENTE") // PENDENTE | RECEBIDA | CANCELADA
+  total      Float     @default(0)
+  notes      String?
+  createdAt  DateTime  @default(now())
+
+  items     PurchaseItem[]
+  financial FinancialEntry[]
+}
+
+model PurchaseItem {
+  id         Int      @id @default(autoincrement())
+  purchaseId Int
+  purchase   Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  productId  Int
+  product    Product  @relation(fields: [productId], references: [id])
+  quantity   Float
+  unitCost   Float
+  total      Float
+}
+
+model ServiceOrder {
+  id             Int       @id @default(autoincrement())
+  clientId       Int?
+  client         Client?   @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  technicianId   Int?
+  technician     Employee? @relation(fields: [technicianId], references: [id], onDelete: SetNull)
+  userId         Int?
+  user           User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  equipment      String // Equipamento / Objeto do serviço
+  serialNumber   String?
+  reportedIssue  String // Defeito / solicitação relatada
+  diagnosis      String? // Diagnóstico / serviço executado
+  priority       String    @default("NORMAL") // BAIXA | NORMAL | ALTA | URGENTE
+  status         String    @default("ABERTA") // ABERTA | EM_ANDAMENTO | AGUARDANDO_PECA | CONCLUIDA | CANCELADA
+  paymentMethod  String?
+  openedAt       DateTime  @default(now())
+  expectedDate   DateTime?
+  completedAt    DateTime?
+  laborCost      Float     @default(0) // Mão de obra
+  partsSubtotal  Float     @default(0) // Peças / produtos
+  discount       Float     @default(0)
+  total          Float     @default(0)
+  notes          String?
+  createdAt      DateTime  @default(now())
+
+  items     ServiceOrderItem[]
+  financial FinancialEntry[]
+}
+
+model ServiceOrderItem {
+  id             Int          @id @default(autoincrement())
+  serviceOrderId Int
+  serviceOrder   ServiceOrder @relation(fields: [serviceOrderId], references: [id], onDelete: Cascade)
+  productId      Int
+  product        Product      @relation(fields: [productId], references: [id])
+  quantity       Float
+  unitPrice      Float
+  total          Float
+}
+
+model StockMovement {
+  id        Int      @id @default(autoincrement())
+  productId Int
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  type      String // ENTRADA | SAIDA | AJUSTE
+  quantity  Float
+  reason    String?
+  userId    Int?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
+}
+
+model FinancialEntry {
+  id             Int           @id @default(autoincrement())
+  type           String // RECEITA | DESPESA
+  description    String
+  category       String?
+  amount         Float
+  dueDate        DateTime
+  paidAt         DateTime?
+  status         String        @default("PENDENTE") // PENDENTE | PAGO | CANCELADO
+  notes          String?
+  saleId         Int?
+  sale           Sale?         @relation(fields: [saleId], references: [id], onDelete: SetNull)
+  purchaseId     Int?
+  purchase       Purchase?     @relation(fields: [purchaseId], references: [id], onDelete: SetNull)
+  serviceOrderId Int?
+  serviceOrder   ServiceOrder? @relation(fields: [serviceOrderId], references: [id], onDelete: SetNull)
+  createdAt      DateTime      @default(now())
+}
