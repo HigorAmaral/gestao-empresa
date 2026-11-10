@@ -53,7 +53,7 @@ export default async function NovaProducaoPage() {
         <ActionForm action={createProductionOrder.bind(null)}>
           {/* Seção 1: Dados do Produto a Fabricar e Máquina */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 16, marginBottom: 20 }}>
-            <div style={{ gridColumn: "span 2" }}>
+            <div style={{ gridColumn: "1 / -1" }}>
               <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
                 Produto Acabado a Fabricar *
               </label>

@@ -38,11 +38,6 @@ export default async function EstoquePage({ searchParams }: { searchParams: SP }
       <PageHeader
         title="Estoque"
         subtitle="Saldos, movimentações e inventário"
-        actions={
-          <Link className="btn secondary" href="/estoque/enderecamento">
-            <MapPin size={15} /> Endereçamento de Estoque
-          </Link>
-        }
       />
 
       <div className="subnav-tabs">

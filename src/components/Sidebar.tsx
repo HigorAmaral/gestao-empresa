@@ -192,14 +192,6 @@ export function Sidebar({
             >
               {dark ? <Sun size={15} /> : <Moon size={15} />}
             </button>
-            <button
-              type="button"
-              className="theme-btn mobile-close-btn"
-              onClick={() => setDrawerOpen(false)}
-              title="Fechar menu"
-            >
-              <X size={15} />
-            </button>
           </div>
         </div>
 
