@@ -52,10 +52,33 @@ O **GestãoPro** integra todas as áreas essenciais de uma pequena ou média emp
 ## Tecnologias Utilizadas
 
 - **[Next.js 16](https://nextjs.org/)** (App Router, React Server Components & Server Actions)
+- **[Django 5.2](https://www.djangoproject.com/) + [Django REST Framework](https://www.django-rest-framework.org/)** (Backend ORM integrado, Painel **Django Admin** customizado e API REST compartilhando o mesmo banco SQLite)
 - **[React 19](https://react.dev/)** + **TypeScript**
-- **[Prisma ORM 6](https://www.prisma.io/)** + **SQLite** (banco em arquivo local, sem necessidade de servidor externo)
+- **[Prisma ORM 6](https://www.prisma.io/)** + **SQLite** (banco em arquivo local `prisma/dev.db`, compartilhado entre Next.js e Django)
 - **[Lucide React](https://lucide.dev/)** (ícones vetoriais minimalistas)
 - **[Jose](https://github.com/panva/jose)** & **[bcryptjs](https://github.com/dcodeIO/bcrypt.js)** (autenticação JWT em cookie `httpOnly` e hash de senhas)
+
+---
+
+## Backend Django & Django Admin (`django_backend/`)
+
+O projeto possui um backend **Django** completo em `django_backend/` conectado diretamente ao mesmo banco SQLite (`prisma/dev.db`) utilizado pelo Next.js, com conversão automática de datas via `PrismaDateTimeField`.
+
+### Iniciar o servidor Django (porta 8000)
+
+```bash
+npm run django
+# ou diretamente:
+python django_backend/manage.py runserver 8000
+```
+
+- **Django Admin:** `http://localhost:8000/admin/`
+  - **Usuário:** `admin` | **Senha:** `admin123`
+  - Inclui inlines de itens (Vendas, Compras e Ordens de Serviço) e ações em lote para **Confirmar vendas**, **Receber compras** e **Baixar lançamentos financeiros**.
+- **API REST navegável (Django REST Framework):** `http://localhost:8000/api/`
+  - `GET /api/resumo/` — KPIs consolidados do ERP via Django ORM
+  - `GET/POST /api/clientes/`, `/api/fornecedores/`, `/api/produtos/`, `/api/funcionarios/`
+  - `GET/POST /api/vendas/`, `/api/compras/`, `/api/os/`, `/api/estoque/`, `/api/financeiro/`, `/api/auditoria/`
 
 ---
 
