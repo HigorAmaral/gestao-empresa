@@ -30,6 +30,7 @@ import type { SidebarAlerts } from "@/lib/audit";
 import { hasModuleAccess, type ModuleKey } from "@/lib/permissions";
 import type { Session } from "@/lib/token";
 import { GlobalSearch } from "./GlobalSearch";
+import { PwaInstallButton } from "./PwaManager";
 
 type Item = {
   href: string;
@@ -170,6 +171,7 @@ export function Sidebar({
             </button>
           </form>
         </div>
+        <PwaInstallButton />
       </div>
     </aside>
   );
