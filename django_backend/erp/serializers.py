@@ -20,6 +20,8 @@ from .models import (
     GoodsReceiptItem,
     ProductionOrder,
     ProductionOrderItem,
+    ProductRecipeItem,
+    ProductionMachine,
     Supplier,
 )
 
@@ -191,5 +193,22 @@ class ProductionOrderSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductionOrder
         fields = "__all__"
+
+
+class ProductRecipeItemSerializer(serializers.ModelSerializer):
+    product_name = serializers.CharField(source="product.name", read_only=True)
+    component_name = serializers.CharField(source="component.name", read_only=True)
+    component_sku = serializers.CharField(source="component.sku", read_only=True)
+
+    class Meta:
+        model = ProductRecipeItem
+        fields = "__all__"
+
+
+class ProductionMachineSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProductionMachine
+        fields = "__all__"
+
 
 

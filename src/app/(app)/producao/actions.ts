@@ -324,3 +324,62 @@ export async function cancelProductionOrder(id: number) {
   revalidateAll();
   redirect(`/producao/${id}?ok=${encodeURIComponent("Ordem de produção cancelada.")}`);
 }
+
+export async function createProductionMachine(_prev: FormState, fd: FormData): Promise<FormState> {
+  const session = await requireUser();
+  await ensureStockLocationTables();
+
+  try {
+    const name = str(fd, "name");
+    const code = str(fd, "code");
+    const category = str(fd, "category");
+    const location = str(fd, "location");
+
+    if (!name) {
+      throw new ValidationError("O nome da máquina ou posto de trabalho é obrigatório.");
+    }
+
+    const existing = await prisma.productionMachine.findUnique({
+      where: { name },
+    });
+    if (existing) {
+      throw new ValidationError(`Já existe uma máquina cadastrada com o nome "${name}".`);
+    }
+
+    await prisma.productionMachine.create({
+      data: {
+        name,
+        code: code || null,
+        category: category || null,
+        location: location || null,
+        active: true,
+      },
+    });
+
+    await logAudit(session, "PRODUCAO", "CRIAR_MAQUINA", `Máquina ${name} cadastrada.`);
+  } catch (err) {
+    return toFormError(err);
+  }
+
+  revalidateAll();
+  redirect(`/producao?tab=maquinas&ok=${encodeURIComponent("Máquina cadastrada com sucesso!")}`);
+}
+
+export async function deleteProductionMachine(id: number) {
+  const session = await requireUser();
+  await ensureStockLocationTables();
+
+  try {
+    const machine = await prisma.productionMachine.findUnique({ where: { id } });
+    if (!machine) throw new ValidationError("Máquina não encontrada.");
+
+    await prisma.productionMachine.delete({ where: { id } });
+    await logAudit(session, "PRODUCAO", "EXCLUIR_MAQUINA", `Máquina ${machine.name} removida.`, id);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Erro ao remover máquina.";
+    redirect(`/producao?tab=maquinas&erro=${encodeURIComponent(msg)}`);
+  }
+
+  revalidateAll();
+  redirect(`/producao?tab=maquinas&ok=${encodeURIComponent("Máquina removida com sucesso!")}`);
+}

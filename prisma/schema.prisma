@@ -124,6 +124,8 @@ model Product {
   receiptItems         GoodsReceiptItem[]
   productionOrders     ProductionOrder[]     @relation("ProductProduction")
   productionOrderItems ProductionOrderItem[] @relation("ProductRawMaterial")
+  recipeItems          ProductRecipeItem[]   @relation("ProductRecipe")
+  usedInRecipes        ProductRecipeItem[]   @relation("ProductRecipeComponent")
 }
 
 model Employee {
@@ -379,5 +381,32 @@ model ProductionOrderItem {
   locationId        Int?             // Endereço de estoque de onde retirar
   location          StockLocation?   @relation(fields: [locationId], references: [id], onDelete: SetNull)
   notes             String?
+}
+
+// ---------- Ficha Técnica / Receita de Produção (BOM) ----------
+
+model ProductRecipeItem {
+  id          Int      @id @default(autoincrement())
+  productId   Int      // Produto final fabricado
+  product     Product  @relation("ProductRecipe", fields: [productId], references: [id], onDelete: Cascade)
+  componentId Int      // Insumo / Matéria-prima necessária
+  component   Product  @relation("ProductRecipeComponent", fields: [componentId], references: [id], onDelete: Restrict)
+  quantity    Float    @default(1) // Quantidade necessária para produzir 1 UN do produto final
+  notes       String?  // Especificações técnicas / tolerâncias
+  createdAt   DateTime @default(now())
+
+  @@unique([productId, componentId])
+}
+
+// ---------- Cadastro de Máquinas / Postos de Trabalho ----------
+
+model ProductionMachine {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique // Ex: "Torno CNC 01"
+  code      String?  // Ex: "M-01"
+  category  String?  // Ex: "Usinagem", "Injeção", "Montagem", "Solda"
+  location  String?  // Ex: "Galpão A - Setor 2"
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
 }
 

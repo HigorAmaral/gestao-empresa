@@ -12,6 +12,7 @@ import {
   Package,
   Play,
   Printer,
+  Tag,
   User,
   Wrench,
   XCircle,
@@ -21,6 +22,7 @@ import { fmtDate, fmtDateTime, num } from "@/lib/format";
 import { FlashMessages, PageHeader, StatusBadge } from "@/components/ui";
 import { ConfirmButton } from "@/components/Forms";
 import { ensureStockLocationTables } from "@/lib/stock-location";
+import { ProductionPickingChecklist } from "./ProductionPickingChecklist";
 import {
   cancelProductionOrder,
   completeProductionOrder,
@@ -70,6 +72,9 @@ export default async function ProductionOrderDetailPage({
             </Link>
             <Link className="btn secondary" href={`/producao/${order.id}/recibo`}>
               <Printer size={15} /> Ficha da Máquina
+            </Link>
+            <Link className="btn secondary" href={`/producao/${order.id}/etiquetas`}>
+              <Tag size={15} /> Etiquetas do Lote
             </Link>
           </div>
         }
@@ -220,91 +225,12 @@ export default async function ProductionOrderDetailPage({
         </div>
       </div>
 
-      {/* Lista de Insumos & Separação no Estoque (BOM) */}
-      <div className="card table-responsive">
-        <div style={{ padding: "4px 0 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div>
-            <h3 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>
-              Lista de Insumos & Separação para Entrega na Máquina (BOM)
-            </h3>
-            <p style={{ fontSize: 12.5, color: "var(--muted)", margin: "3px 0 0" }}>
-              Materiais que o almoxarifado deve separar e transportar até a máquina <strong>{order.machine}</strong>.
-            </p>
-          </div>
-          <Link className="btn secondary" href={`/producao/${order.id}/recibo`}>
-            <Printer size={14} /> Imprimir Ficha de Separação
-          </Link>
-        </div>
-
-        <table>
-          <thead>
-            <tr>
-              <th style={{ width: 40 }}>Check</th>
-              <th>Matéria-Prima / Insumo</th>
-              <th style={{ textAlign: "right" }}>Qtd Necessária</th>
-              <th>Endereço para Retirada no Estoque</th>
-              <th>Instrução do Insumo</th>
-              <th>Disponibilidade no Estoque</th>
-            </tr>
-          </thead>
-          <tbody>
-            {order.items.map((item, index) => {
-              const isSufficient = item.product.stock >= item.quantityRequired;
-              return (
-                <tr key={item.id}>
-                  <td>
-                    <input type="checkbox" style={{ cursor: "pointer", width: 16, height: 16 }} />
-                  </td>
-                  <td>
-                    <div style={{ fontWeight: 600 }}>{item.product.name}</div>
-                    {item.product.sku && (
-                      <div style={{ fontSize: 11, color: "var(--muted)" }}>SKU: {item.product.sku}</div>
-                    )}
-                  </td>
-                  <td style={{ textAlign: "right", fontWeight: 700 }}>
-                    {num(item.quantityRequired)} {item.product.unit}
-                  </td>
-                  <td>
-                    {item.location ? (
-                      <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                        <span className="badge blue" style={{ fontWeight: 600 }}>
-                          <MapPin size={11} style={{ marginRight: 3 }} />
-                          {item.location.code}
-                        </span>
-                        <span style={{ fontSize: 12, color: "var(--muted)" }}>
-                          {[item.location.aisle, item.location.rack, item.location.shelf, item.location.bin]
-                            .filter(Boolean)
-                            .join(" / ")}
-                        </span>
-                      </div>
-                    ) : (
-                      <span style={{ color: "var(--muted)", fontSize: 12 }}>Área geral (sem endereço específico)</span>
-                    )}
-                  </td>
-                  <td>
-                    {item.notes ? (
-                      <span style={{ fontSize: 12.5 }}>{item.notes}</span>
-                    ) : (
-                      <span style={{ color: "var(--muted)", fontSize: 12 }}>—</span>
-                    )}
-                  </td>
-                  <td>
-                    {isSufficient ? (
-                      <span className="badge green" style={{ fontSize: 11 }}>
-                        <CheckCircle2 size={11} style={{ marginRight: 3 }} /> Saldo: {item.product.stock} {item.product.unit}
-                      </span>
-                    ) : (
-                      <span className="badge red" style={{ fontSize: 11 }} title="Estoque insuficiente">
-                        <AlertTriangle size={11} style={{ marginRight: 3 }} /> Saldo: {item.product.stock} (Falta {num(item.quantityRequired - item.product.stock)})
-                      </span>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+      {/* Lista de Insumos & Separação no Estoque (BOM) Interativa com Bipagem */}
+      <ProductionPickingChecklist
+        orderId={order.id}
+        machine={order.machine}
+        items={order.items}
+      />
     </>
   );
 }

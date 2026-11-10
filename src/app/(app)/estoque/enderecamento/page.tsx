@@ -22,6 +22,7 @@ import { num } from "@/lib/format";
 import { ExportCsvButton, FlashMessages, PageHeader, Pagination } from "@/components/ui";
 import { ActionForm, ConfirmButton } from "@/components/Forms";
 import { ensureStockLocationTables } from "@/lib/stock-location";
+import { EnderecamentoScanner } from "./EnderecamentoScanner";
 import {
   assignProductLocation,
   batchCreateLocations,
@@ -211,6 +212,7 @@ export default async function EnderecamentoPage({ searchParams }: { searchParams
             <Link className="btn secondary" href="/estoque">
               <ArrowLeft size={15} /> Voltar ao Estoque
             </Link>
+            <EnderecamentoScanner />
             <Link className="btn secondary" href="/estoque/enderecamento/etiquetas">
               <Tag size={15} /> Imprimir Etiquetas
             </Link>

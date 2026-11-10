@@ -22,6 +22,8 @@ from .models import (
     GoodsReceiptItem,
     ProductionOrder,
     ProductionOrderItem,
+    ProductRecipeItem,
+    ProductionMachine,
     Supplier,
 )
 
@@ -244,5 +246,20 @@ class ProductionOrderAdmin(admin.ModelAdmin):
     list_filter = ("status", "priority", "machine")
     search_fields = ("code", "product__name", "machine", "operator_name", "notes")
     inlines = [ProductionOrderItemInline]
+
+
+@admin.register(ProductRecipeItem)
+class ProductRecipeItemAdmin(admin.ModelAdmin):
+    list_display = ("id", "product", "component", "quantity", "notes", "created_at")
+    list_filter = ("product",)
+    search_fields = ("product__name", "component__name", "notes")
+
+
+@admin.register(ProductionMachine)
+class ProductionMachineAdmin(admin.ModelAdmin):
+    list_display = ("name", "code", "category", "location", "active", "created_at")
+    list_filter = ("category", "active")
+    search_fields = ("name", "code", "category", "location")
+
 
 

@@ -116,12 +116,57 @@ export async function ensureStockLocationTables(): Promise<void> {
       );
     `);
 
+    // 7. Cria a tabela ProductRecipeItem (Ficha Técnica / BOM)
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "ProductRecipeItem" (
+        "id" SERIAL PRIMARY KEY,
+        "productId" INTEGER NOT NULL,
+        "componentId" INTEGER NOT NULL,
+        "quantity" DOUBLE PRECISION NOT NULL DEFAULT 1,
+        "notes" TEXT,
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "ProductRecipeItem_productId_componentId_key" UNIQUE ("productId", "componentId"),
+        CONSTRAINT "ProductRecipeItem_productId_fkey" FOREIGN KEY ("productId") REFERENCES "Product"("id") ON DELETE CASCADE,
+        CONSTRAINT "ProductRecipeItem_componentId_fkey" FOREIGN KEY ("componentId") REFERENCES "Product"("id") ON DELETE RESTRICT
+      );
+    `);
+
+    // 8. Cria a tabela ProductionMachine (Máquinas / Postos de Trabalho)
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "ProductionMachine" (
+        "id" SERIAL PRIMARY KEY,
+        "name" VARCHAR(150) NOT NULL UNIQUE,
+        "code" VARCHAR(50),
+        "category" VARCHAR(100),
+        "location" VARCHAR(150),
+        "active" BOOLEAN NOT NULL DEFAULT true,
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     // Índices
     await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "ProductStockLocation_productId_idx" ON "ProductStockLocation"("productId");`);
     await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "ProductStockLocation_locationId_idx" ON "ProductStockLocation"("locationId");`);
+    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "ProductRecipeItem_productId_idx" ON "ProductRecipeItem"("productId");`);
     await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "GoodsReceipt_code_idx" ON "GoodsReceipt"("code");`);
     await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "ProductionOrder_code_idx" ON "ProductionOrder"("code");`);
     await prisma.$executeRawUnsafe(`ALTER TABLE "CompanySettings" ADD COLUMN IF NOT EXISTS "logoUrl" TEXT;`).catch(() => {});
+
+    // Popula máquinas padrão caso vazio
+    const machineCount = await prisma.productionMachine.count().catch(() => 0);
+    if (machineCount === 0) {
+      await prisma.productionMachine.createMany({
+        data: [
+          { name: "Torno CNC 01", code: "M-01", category: "Usinagem", location: "Galpão 1 - Setor A" },
+          { name: "Torno CNC 02", code: "M-02", category: "Usinagem", location: "Galpão 1 - Setor A" },
+          { name: "Centro de Usinagem 01", code: "M-03", category: "Fresamento", location: "Galpão 1 - Setor B" },
+          { name: "Injetora 01", code: "M-04", category: "Injeção", location: "Galpão 2 - Setor Plásticos" },
+          { name: "Bancada de Montagem 01", code: "M-05", category: "Montagem", location: "Linha de Produção 1" },
+          { name: "Linha de Solda 01", code: "M-06", category: "Soldagem", location: "Setor de Serralheria" },
+        ],
+        skipDuplicates: true,
+      }).catch(() => {});
+    }
 
     // Endereços padrão caso a tabela esteja totalmente vazia
     const count = await prisma.stockLocation.count().catch(() => 0);
@@ -223,6 +268,28 @@ export async function ensureStockLocationTables(): Promise<void> {
       try {
         await prisma.$executeRawUnsafe(`ALTER TABLE "CompanySettings" ADD COLUMN "logoUrl" TEXT;`);
       } catch {}
+      await prisma.$executeRawUnsafe(`
+        CREATE TABLE IF NOT EXISTS "ProductRecipeItem" (
+          "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+          "productId" INTEGER NOT NULL REFERENCES "Product"("id") ON DELETE CASCADE,
+          "componentId" INTEGER NOT NULL REFERENCES "Product"("id") ON DELETE RESTRICT,
+          "quantity" REAL NOT NULL DEFAULT 1,
+          "notes" TEXT,
+          "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE ("productId", "componentId")
+        );
+      `);
+      await prisma.$executeRawUnsafe(`
+        CREATE TABLE IF NOT EXISTS "ProductionMachine" (
+          "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+          "name" TEXT NOT NULL UNIQUE,
+          "code" TEXT,
+          "category" TEXT,
+          "location" TEXT,
+          "active" BOOLEAN NOT NULL DEFAULT 1,
+          "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
       tablesChecked = true;
     } catch (sqliteError) {
       console.error("Falha ao inicializar tabelas auxiliares:", pgError, sqliteError);

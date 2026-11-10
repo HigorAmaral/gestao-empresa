@@ -8,6 +8,8 @@ import { PageHeader, StatusBadge } from "@/components/ui";
 import { ActionForm } from "@/components/Forms";
 import { saveProduct } from "../actions";
 
+import { ProductRecipeEditor, type RecipeProductOption } from "../ProductRecipeEditor";
+
 const UNITS = ["UN", "CX", "KG", "G", "L", "ML", "M", "M2", "PC", "PCT", "HR", "SV"];
 
 export default async function ProdutoFormPage({ params }: { params: Promise<{ id: string }> }) {
@@ -17,7 +19,7 @@ export default async function ProdutoFormPage({ params }: { params: Promise<{ id
   const product = isNew ? null : await prisma.product.findUnique({ where: { id: Number(id) } });
   if (!isNew && !product) notFound();
 
-  const [suppliers, categories, movements, stockLocations] = await Promise.all([
+  const [suppliers, categories, movements, stockLocations, allActiveProducts, recipeItems] = await Promise.all([
     prisma.supplier.findMany({ where: { OR: [{ active: true }, { id: product?.supplierId ?? -1 }] }, orderBy: { name: "asc" } }),
     prisma.product.findMany({ where: { category: { not: null } }, distinct: ["category"], select: { category: true } }),
     product
@@ -29,6 +31,21 @@ export default async function ProdutoFormPage({ params }: { params: Promise<{ id
             where: { productId: product.id },
             include: { location: true },
             orderBy: { location: { code: "asc" } },
+          })
+          .catch(() => [])
+      : Promise.resolve([]),
+    product
+      ? prisma.product.findMany({
+          where: { active: true },
+          orderBy: { name: "asc" },
+          include: { stockLocations: { include: { location: true } } },
+        })
+      : Promise.resolve([]),
+    product
+      ? prisma.productRecipeItem
+          .findMany({
+            where: { productId: product.id },
+            orderBy: { id: "asc" },
           })
           .catch(() => [])
       : Promise.resolve([]),
@@ -120,6 +137,29 @@ export default async function ProdutoFormPage({ params }: { params: Promise<{ id
           </div>
         </ActionForm>
       </div>
+
+      {product && (
+        <div className="card" style={{ marginBottom: 20 }}>
+          <ProductRecipeEditor
+            productId={product.id}
+            productName={product.name}
+            availableProducts={allActiveProducts.map((p) => ({
+              id: p.id,
+              sku: p.sku,
+              name: p.name,
+              unit: p.unit,
+              costPrice: p.costPrice,
+              stock: p.stock,
+              locationCode: p.stockLocations[0]?.location.code || null,
+            }))}
+            initialRecipe={recipeItems.map((r) => ({
+              componentId: r.componentId,
+              quantity: r.quantity,
+              notes: r.notes || "",
+            }))}
+          />
+        </div>
+      )}
 
       {product && (
         <div className="card flush mb" style={{ marginBottom: 20 }}>

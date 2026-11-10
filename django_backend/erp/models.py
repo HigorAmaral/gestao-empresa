@@ -733,3 +733,53 @@ class ProductionOrderItem(models.Model):
         return f"{self.quantity_required}x {self.product.name} -> {self.production_order.code}"
 
 
+class ProductRecipeItem(models.Model):
+    id = models.AutoField(primary_key=True)
+    product = models.ForeignKey(
+        Product,
+        verbose_name="Produto Acabado",
+        on_delete=models.CASCADE,
+        db_column="productId",
+        related_name="recipe_items",
+    )
+    component = models.ForeignKey(
+        Product,
+        verbose_name="Insumo / Matéria-Prima",
+        on_delete=models.PROTECT,
+        db_column="componentId",
+        related_name="used_in_recipes",
+    )
+    quantity = models.FloatField("Quantidade por Unidade", default=1)
+    notes = models.TextField("Especificação Técnica", blank=True, null=True)
+    created_at = PrismaDateTimeField("Criado em", default=timezone.now, db_column="createdAt")
+
+    class Meta:
+        db_table = "ProductRecipeItem"
+        verbose_name = "Item da Ficha Técnica (BOM)"
+        verbose_name_plural = "Itens da Ficha Técnica (BOM)"
+        unique_together = [("product", "component")]
+
+    def __str__(self):
+        return f"{self.quantity}x {self.component.name} para 1x {self.product.name}"
+
+
+class ProductionMachine(models.Model):
+    id = models.AutoField(primary_key=True)
+    name = models.CharField("Nome da Máquina / Posto", max_length=150, unique=True)
+    code = models.CharField("Código / Tag", max_length=50, blank=True, null=True)
+    category = models.CharField("Categoria / Setor", max_length=100, blank=True, null=True)
+    location = models.CharField("Localização Física", max_length=150, blank=True, null=True)
+    active = models.BooleanField("Ativo", default=True)
+    created_at = PrismaDateTimeField("Criado em", default=timezone.now, db_column="createdAt")
+
+    class Meta:
+        db_table = "ProductionMachine"
+        verbose_name = "Máquina / Posto de Trabalho"
+        verbose_name_plural = "Máquinas & Postos de Trabalho"
+        ordering = ["name"]
+
+    def __str__(self):
+        return f"{self.name} ({self.code or 'Sem tag'})"
+
+
+

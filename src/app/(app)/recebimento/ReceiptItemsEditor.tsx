@@ -1,8 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { AlertCircle, MapPin, Plus, Trash2 } from "lucide-react";
+import { AlertCircle, Camera, CheckCircle2, MapPin, Plus, Trash2 } from "lucide-react";
 import { brl } from "@/lib/format";
+import { BarcodeScannerModal } from "@/components/BarcodeScannerModal";
 
 export type ReceiptProduct = {
   id: number;
@@ -43,29 +44,44 @@ export function ReceiptItemsEditor({
 }) {
   const [items, setItems] = useState<ReceiptItemRow[]>(initialItems);
   const [selectedProductId, setSelectedProductId] = useState<string>("");
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [scanNotification, setScanNotification] = useState<string | null>(null);
 
   const productsById = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
 
   const totalQuantity = items.reduce((s, i) => s + (Number(i.quantity) || 0), 0);
   const totalCost = items.reduce((s, i) => s + (Number(i.quantity) || 0) * (Number(i.unitCost) || 0), 0);
 
-  function addItem() {
-    const pId = Number(selectedProductId);
-    const prod = productsById.get(pId);
+  function addItem(pId?: number) {
+    const id = pId !== undefined ? pId : Number(selectedProductId);
+    const prod = productsById.get(id);
     if (!prod) return;
 
-    setItems((prev) => [
-      ...prev,
-      {
-        productId: prod.id,
-        quantity: 1,
-        unitCost: prod.costPrice || 0,
-        locationId: locations.length > 0 ? locations[0].id : null,
-        batch: "",
-        notes: "",
-      },
-    ]);
-    setSelectedProductId("");
+    // Se já estiver na lista, incrementa quantidade
+    const existingIndex = items.findIndex((i) => i.productId === id);
+    if (existingIndex >= 0) {
+      setItems((prev) =>
+        prev.map((row, idx) =>
+          idx === existingIndex ? { ...row, quantity: row.quantity + 1 } : row
+        )
+      );
+      setScanNotification(`+1 un adicionada ao produto "${prod.name}" (total: ${items[existingIndex].quantity + 1}).`);
+    } else {
+      setItems((prev) => [
+        ...prev,
+        {
+          productId: prod.id,
+          quantity: 1,
+          unitCost: prod.costPrice || 0,
+          locationId: locations.length > 0 ? locations[0].id : null,
+          batch: "",
+          notes: "",
+        },
+      ]);
+      setScanNotification(`Produto "${prod.name}" adicionado à conferência.`);
+    }
+
+    if (pId === undefined) setSelectedProductId("");
   }
 
   function updateItem(index: number, patch: Partial<ReceiptItemRow>) {
@@ -76,12 +92,55 @@ export function ReceiptItemsEditor({
     setItems((prev) => prev.filter((_, idx) => idx !== index));
   }
 
+  function handleBarcodeScanned(code: string) {
+    const clean = code.trim().toLowerCase();
+    const prod = products.find(
+      (p) =>
+        (p.sku && p.sku.toLowerCase() === clean) ||
+        p.name.toLowerCase() === clean ||
+        String(p.id) === clean
+    );
+
+    if (prod) {
+      addItem(prod.id);
+      return;
+    }
+
+    // Se for código de localização
+    const loc = locations.find((l) => l.code.toLowerCase() === clean);
+    if (loc && items.length > 0) {
+      updateItem(items.length - 1, { locationId: loc.id });
+      setScanNotification(`Endereço "${loc.code}" vinculado ao último item conferido.`);
+      return;
+    }
+
+    setScanNotification(`Código "${code}" não encontrado no cadastro de produtos ou endereços.`);
+  }
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       {/* Input Oculto serializando os itens em JSON para o Server Action */}
       <input type="hidden" name="items" value={JSON.stringify(items)} />
 
-      {/* Seletor para Adicionar Insumo / Mercadoria */}
+      {scanNotification && (
+        <div
+          style={{
+            padding: "8px 12px",
+            background: scanNotification.includes("não encontrado") ? "#fef2f2" : "#ecfdf5",
+            color: scanNotification.includes("não encontrado") ? "#b91c1c" : "#047857",
+            borderRadius: 6,
+            fontSize: 12.5,
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+          }}
+        >
+          <CheckCircle2 size={14} />
+          <span>{scanNotification}</span>
+        </div>
+      )}
+
+      {/* Seletor para Adicionar Insumo / Mercadoria & Bipagem */}
       <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
         <select
           value={selectedProductId}
@@ -99,11 +158,21 @@ export function ReceiptItemsEditor({
         <button
           type="button"
           className="btn"
-          onClick={addItem}
+          onClick={() => addItem()}
           disabled={!selectedProductId}
           style={{ whiteSpace: "nowrap" }}
         >
           <Plus size={16} /> Adicionar Item à Carga
+        </button>
+
+        <button
+          type="button"
+          className="btn secondary"
+          onClick={() => setScannerOpen(true)}
+          style={{ whiteSpace: "nowrap" }}
+          title="Bipar código de barras com a câmera ou leitor"
+        >
+          <Camera size={16} /> Bipar Código de Barras
         </button>
       </div>
 
@@ -118,7 +187,7 @@ export function ReceiptItemsEditor({
             color: "var(--muted)",
           }}
         >
-          Nenhum item adicionado ainda. Selecione um produto ou matéria-prima acima para iniciar a conferência.
+          Nenhum item adicionado ainda. Selecione um produto acima ou clique em <strong>Bipar Código de Barras</strong> para iniciar a conferência rápida.
         </div>
       ) : (
         <div className="table-responsive" style={{ border: "1px solid var(--border)", borderRadius: 8 }}>
@@ -229,6 +298,15 @@ export function ReceiptItemsEditor({
           </table>
         </div>
       )}
+
+      {/* Leitor de código de barras pela câmera */}
+      <BarcodeScannerModal
+        isOpen={scannerOpen}
+        onClose={() => setScannerOpen(false)}
+        onScan={handleBarcodeScanned}
+        title="Bipar Produto no Recebimento"
+        instruction="Aponte a câmera para o código de barras da caixa ou embalagem do produto recebido."
+      />
     </div>
   );
 }
