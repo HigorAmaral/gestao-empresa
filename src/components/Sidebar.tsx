@@ -62,7 +62,7 @@ const SECTIONS: { title: string; items: Item[] }[] = [
   },
 ];
 
-export function Sidebar({ session }: { session: Session }) {
+export function Sidebar({ session, brandName = "GestãoPro" }: { session: Session; brandName?: string }) {
   const pathname = usePathname();
   const isAdmin = session.role === "ADMIN";
   const [dark, setDark] = useState(false);
@@ -96,7 +96,7 @@ export function Sidebar({ session }: { session: Session }) {
           <div className="logo">
             <Building2 size={18} strokeWidth={2.2} />
           </div>
-          <span>GestãoPro</span>
+          <span>{brandName}</span>
         </div>
         <button
           type="button"

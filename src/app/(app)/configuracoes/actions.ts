@@ -32,6 +32,7 @@ export async function saveCompanySettings(_prev: FormState, fd: FormData): Promi
   } catch (e) {
     return toFormError(e);
   }
+  revalidatePath("/", "layout");
   revalidatePath("/configuracoes");
   return { success: "Configurações da empresa atualizadas com sucesso." };
 }
