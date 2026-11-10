@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { createSession, destroySession } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
+import { parsePermissions } from "@/lib/permissions";
 import type { FormState } from "@/lib/form";
 
 export async function login(_prev: FormState, fd: FormData): Promise<FormState> {
@@ -16,11 +17,13 @@ export async function login(_prev: FormState, fd: FormData): Promise<FormState> 
   const ok = user && user.active && (await bcrypt.compare(password, user.passwordHash));
   if (!ok || !user) return { error: "E-mail ou senha inválidos." };
 
+  const role = (user.role === "ADMIN" ? "ADMIN" : "FUNCIONARIO") as "ADMIN" | "FUNCIONARIO";
   const session = {
     userId: user.id,
     name: user.name,
     email: user.email,
-    role: (user.role === "ADMIN" ? "ADMIN" : "FUNCIONARIO") as "ADMIN" | "FUNCIONARIO",
+    role,
+    permissions: parsePermissions(user.permissions, role),
   };
   await createSession(session);
   await logAudit(session, "AUTH", "LOGIN", `Login efetuado por ${user.email}`, user.id);

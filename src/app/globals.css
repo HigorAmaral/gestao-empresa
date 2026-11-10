@@ -742,6 +742,94 @@ textarea { min-height: 80px; resize: vertical; }
   margin-top: 6px; flex-shrink: 0;
 }
 
+/* ---------- Seletor de Permissões de Módulos ---------- */
+.perm-box {
+  background: var(--surface-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+}
+.perm-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.perm-login-toggle {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  padding: 7px 12px;
+  border-radius: 7px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.perm-presets {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  margin-bottom: 14px;
+}
+.perm-preset-btns {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.perm-section {
+  margin-top: 14px;
+}
+.perm-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+.perm-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+}
+.perm-card {
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  padding: 11px 13px;
+  cursor: pointer;
+  user-select: none;
+  transition: border-color 0.15s, background 0.15s, transform 0.12s;
+}
+.perm-card:hover {
+  border-color: var(--text);
+  transform: translateY(-1px);
+}
+.perm-card.checked {
+  border-color: var(--border-strong);
+  background: var(--surface);
+  box-shadow: 0 0 0 1px var(--border-strong);
+}
+.perm-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 5px;
+  font-size: 13px;
+}
+.perm-card-desc {
+  font-size: 11.5px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
 @media print {
   html, body { background: #fff !important; color: #000 !important; }
   .sidebar, .page-header, .filters, .no-print { display: none !important; }

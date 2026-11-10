@@ -3,22 +3,43 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
 import { toInputDate, todayInput } from "@/lib/format";
+import { parsePermissions } from "@/lib/permissions";
 import { PageHeader } from "@/components/ui";
 import { ActionForm } from "@/components/Forms";
+import { PermissionsSelector } from "@/components/PermissionsSelector";
 import { saveEmployee } from "../actions";
 
 export default async function FuncionarioPage({ params }: { params: Promise<{ id: string }> }) {
-  await requireAdmin();
+  await requireAdmin("funcionarios");
   const { id } = await params;
   const isNew = id === "novo";
-  const employee = isNew ? null : await prisma.employee.findUnique({ where: { id: Number(id) } });
+  const employee = isNew
+    ? null
+    : await prisma.employee.findUnique({
+        where: { id: Number(id) },
+        include: { user: true },
+      });
   if (!isNew && !employee) notFound();
 
-  const departments = await prisma.employee.findMany({ where: { department: { not: null } }, distinct: ["department"], select: { department: true } });
+  const departments = await prisma.employee.findMany({
+    where: { department: { not: null } },
+    distinct: ["department"],
+    select: { department: true },
+  });
+
+  const currentRole = employee?.user?.role === "ADMIN" ? "ADMIN" : "FUNCIONARIO";
+  const currentPermissions = parsePermissions(
+    employee?.user?.permissions ?? employee?.permissions,
+    currentRole,
+  );
+  const hasExistingUser = Boolean(employee?.user && employee.user.active);
 
   return (
     <>
-      <PageHeader title={isNew ? "Novo funcionário" : employee!.name} subtitle={isNew ? "Cadastro de colaborador" : employee!.position} />
+      <PageHeader
+        title={isNew ? "Novo funcionário" : employee!.name}
+        subtitle={isNew ? "Cadastro de colaborador e permissões de acesso" : employee!.position}
+      />
       <div className="card">
         <ActionForm
           action={saveEmployee.bind(null, employee?.id ?? null)}
@@ -38,8 +59,8 @@ export default async function FuncionarioPage({ params }: { params: Promise<{ id
               <input name="document" defaultValue={employee?.document ?? ""} />
             </div>
             <div className="field">
-              <label>E-mail</label>
-              <input name="email" type="email" defaultValue={employee?.email ?? ""} />
+              <label>E-mail (usado para login no sistema)</label>
+              <input name="email" type="email" defaultValue={employee?.email ?? employee?.user?.email ?? ""} />
             </div>
             <div className="field">
               <label>Telefone</label>
@@ -64,7 +85,12 @@ export default async function FuncionarioPage({ params }: { params: Promise<{ id
             </div>
             <div className="field s2">
               <label>Admissão *</label>
-              <input name="hireDate" type="date" defaultValue={employee ? toInputDate(employee.hireDate) : todayInput()} required />
+              <input
+                name="hireDate"
+                type="date"
+                defaultValue={employee ? toInputDate(employee.hireDate) : todayInput()}
+                required
+              />
             </div>
             <div className="field s12">
               <label>Observações</label>
@@ -75,6 +101,13 @@ export default async function FuncionarioPage({ params }: { params: Promise<{ id
                 <input type="checkbox" name="active" defaultChecked={employee?.active ?? true} /> Funcionário ativo
               </label>
             </div>
+
+            <PermissionsSelector
+              mode="employee"
+              defaultPermissions={currentPermissions}
+              defaultRole={currentRole}
+              hasExistingUser={hasExistingUser}
+            />
           </div>
         </ActionForm>
       </div>

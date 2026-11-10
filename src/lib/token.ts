@@ -1,4 +1,5 @@
 import { SignJWT, jwtVerify } from "jose";
+import { parsePermissions, type ModuleKey } from "./permissions";
 
 export const SESSION_COOKIE = "session";
 export const SESSION_HOURS = 8;
@@ -10,6 +11,7 @@ export type Session = {
   name: string;
   email: string;
   role: Role;
+  permissions: ModuleKey[];
 };
 
 function secretKey() {
@@ -27,11 +29,18 @@ export async function signToken(session: Session) {
 export async function verifyToken(token: string): Promise<Session | null> {
   try {
     const { payload } = await jwtVerify(token, secretKey());
+    const role: Role = payload.role === "ADMIN" ? "ADMIN" : "FUNCIONARIO";
+    const rawPerms = Array.isArray(payload.permissions)
+      ? payload.permissions.join(",")
+      : typeof payload.permissions === "string"
+        ? payload.permissions
+        : undefined;
     return {
       userId: Number(payload.userId),
       name: String(payload.name),
       email: String(payload.email),
-      role: payload.role === "ADMIN" ? "ADMIN" : "FUNCIONARIO",
+      role,
+      permissions: parsePermissions(rawPerms, role),
     };
   } catch {
     return null;

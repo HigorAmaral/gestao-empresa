@@ -17,9 +17,11 @@ model User {
   email        String   @unique
   passwordHash String
   role         String   @default("FUNCIONARIO") // ADMIN | FUNCIONARIO
+  permissions  String   @default("vendas,os,clientes,produtos,estoque,compras,fornecedores")
   active       Boolean  @default(true)
   createdAt    DateTime @default(now())
 
+  employee      Employee?
   sales         Sale[]
   purchases     Purchase[]
   movements     StockMovement[]
@@ -115,18 +117,21 @@ model Product {
 }
 
 model Employee {
-  id         Int      @id @default(autoincrement())
-  name       String
-  document   String?
-  email      String?
-  phone      String?
-  position   String
-  department String?
-  salary     Float    @default(0)
-  hireDate   DateTime
-  active     Boolean  @default(true)
-  notes      String?
-  createdAt  DateTime @default(now())
+  id          Int      @id @default(autoincrement())
+  name        String
+  document    String?
+  email       String?
+  phone       String?
+  position    String
+  department  String?
+  salary      Float    @default(0)
+  hireDate    DateTime
+  active      Boolean  @default(true)
+  notes       String?
+  permissions String   @default("vendas,os,clientes,produtos,estoque,compras,fornecedores")
+  userId      Int?     @unique
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
 
   serviceOrders ServiceOrder[]
 }

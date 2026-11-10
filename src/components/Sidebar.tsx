@@ -26,38 +26,39 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { logout } from "@/app/login/actions";
+import { hasModuleAccess, type ModuleKey } from "@/lib/permissions";
 import type { Session } from "@/lib/token";
 
-type Item = { href: string; label: string; Icon: LucideIcon; admin?: boolean };
+type Item = { href: string; label: string; Icon: LucideIcon; moduleKey?: ModuleKey };
 
 const SECTIONS: { title: string; items: Item[] }[] = [
   { title: "Geral", items: [{ href: "/", label: "Dashboard", Icon: LayoutDashboard }] },
   {
     title: "Comercial & Serviços",
     items: [
-      { href: "/vendas", label: "Vendas", Icon: ShoppingCart },
-      { href: "/os", label: "Ordens de Serviço", Icon: Wrench },
-      { href: "/clientes", label: "Clientes", Icon: Users },
+      { href: "/vendas", label: "Vendas", Icon: ShoppingCart, moduleKey: "vendas" },
+      { href: "/os", label: "Ordens de Serviço", Icon: Wrench, moduleKey: "os" },
+      { href: "/clientes", label: "Clientes", Icon: Users, moduleKey: "clientes" },
     ],
   },
   {
     title: "Suprimentos",
     items: [
-      { href: "/produtos", label: "Produtos", Icon: Package },
-      { href: "/estoque", label: "Estoque", Icon: Warehouse },
-      { href: "/compras", label: "Compras", Icon: Receipt },
-      { href: "/fornecedores", label: "Fornecedores", Icon: Truck },
+      { href: "/produtos", label: "Produtos", Icon: Package, moduleKey: "produtos" },
+      { href: "/estoque", label: "Estoque", Icon: Warehouse, moduleKey: "estoque" },
+      { href: "/compras", label: "Compras", Icon: Receipt, moduleKey: "compras" },
+      { href: "/fornecedores", label: "Fornecedores", Icon: Truck, moduleKey: "fornecedores" },
     ],
   },
   {
     title: "Gestão & Sistema",
     items: [
-      { href: "/financeiro", label: "Financeiro", Icon: Wallet, admin: true },
-      { href: "/funcionarios", label: "Funcionários", Icon: UserCheck, admin: true },
-      { href: "/relatorios", label: "Relatórios", Icon: BarChart3, admin: true },
-      { href: "/usuarios", label: "Usuários", Icon: ShieldCheck, admin: true },
-      { href: "/auditoria", label: "Auditoria", Icon: History, admin: true },
-      { href: "/configuracoes", label: "Configurações", Icon: Settings, admin: true },
+      { href: "/financeiro", label: "Financeiro", Icon: Wallet, moduleKey: "financeiro" },
+      { href: "/funcionarios", label: "Funcionários", Icon: UserCheck, moduleKey: "funcionarios" },
+      { href: "/relatorios", label: "Relatórios", Icon: BarChart3, moduleKey: "relatorios" },
+      { href: "/usuarios", label: "Usuários", Icon: ShieldCheck, moduleKey: "usuarios" },
+      { href: "/auditoria", label: "Auditoria", Icon: History, moduleKey: "auditoria" },
+      { href: "/configuracoes", label: "Configurações", Icon: Settings, moduleKey: "configuracoes" },
     ],
   },
 ];
@@ -109,7 +110,7 @@ export function Sidebar({ session, brandName = "GestãoPro" }: { session: Sessio
       </div>
       <nav>
         {SECTIONS.map((section) => {
-          const items = section.items.filter((i) => !i.admin || isAdmin);
+          const items = section.items.filter((i) => !i.moduleKey || hasModuleAccess(session, i.moduleKey));
           if (items.length === 0) return null;
           return (
             <div key={section.title}>

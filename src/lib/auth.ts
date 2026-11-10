@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
+import { hasModuleAccess, type ModuleKey } from "./permissions";
 import { SESSION_COOKIE, SESSION_HOURS, signToken, verifyToken, type Session } from "./token";
 
 export type { Session };
@@ -39,8 +40,27 @@ export async function requireUser(): Promise<Session> {
   return session;
 }
 
-export async function requireAdmin(): Promise<Session> {
+export async function requireModule(moduleKey: ModuleKey): Promise<Session> {
   const session = await requireUser();
-  if (session.role !== "ADMIN") redirect("/?erro=" + encodeURIComponent("Acesso restrito a administradores."));
+  if (!hasModuleAccess(session, moduleKey)) {
+    redirect("/?erro=" + encodeURIComponent("Você não tem permissão para acessar este módulo."));
+  }
   return session;
+}
+
+const ADMIN_MODULES: ModuleKey[] = [
+  "financeiro",
+  "funcionarios",
+  "relatorios",
+  "usuarios",
+  "auditoria",
+  "configuracoes",
+];
+
+export async function requireAdmin(moduleKey?: ModuleKey): Promise<Session> {
+  const session = await requireUser();
+  if (session.role === "ADMIN") return session;
+  if (moduleKey && hasModuleAccess(session, moduleKey)) return session;
+  if (!moduleKey && ADMIN_MODULES.some((m) => hasModuleAccess(session, m))) return session;
+  redirect("/?erro=" + encodeURIComponent("Você não tem permissão para acessar este módulo."));
 }

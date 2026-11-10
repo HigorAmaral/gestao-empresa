@@ -1,10 +1,11 @@
 import Link from "next/link";
 import type { Prisma } from "@prisma/client";
-import { Plus } from "lucide-react";
+import { KeyRound, Plus, Shield } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
 import { pageParams, spStr } from "@/lib/form";
 import { brl, fmtDate, todayInput } from "@/lib/format";
+import { ALL_MODULE_KEYS, parsePermissions } from "@/lib/permissions";
 import { ActiveBadge, ExportCsvButton, FlashMessages, PageHeader, Pagination } from "@/components/ui";
 import { ActionForm, ConfirmButton } from "@/components/Forms";
 import { deleteEmployee, generatePayroll } from "./actions";
@@ -12,7 +13,7 @@ import { deleteEmployee, generatePayroll } from "./actions";
 type SP = Promise<Record<string, string | string[] | undefined>>;
 
 export default async function FuncionariosPage({ searchParams }: { searchParams: SP }) {
-  await requireAdmin();
+  await requireAdmin("funcionarios");
   const sp = await searchParams;
   const q = spStr(sp, "q");
   const department = spStr(sp, "department");
@@ -27,17 +28,32 @@ export default async function FuncionariosPage({ searchParams }: { searchParams:
   };
 
   const [employees, total, departments, payroll] = await Promise.all([
-    prisma.employee.findMany({ where, orderBy: { name: "asc" }, skip, take }),
+    prisma.employee.findMany({
+      where,
+      orderBy: { name: "asc" },
+      skip,
+      take,
+      include: { user: true },
+    }),
     prisma.employee.count({ where }),
-    prisma.employee.findMany({ where: { department: { not: null } }, distinct: ["department"], select: { department: true } }),
-    prisma.employee.aggregate({ where: { active: true }, _sum: { salary: true }, _count: true, _avg: { salary: true } }),
+    prisma.employee.findMany({
+      where: { department: { not: null } },
+      distinct: ["department"],
+      select: { department: true },
+    }),
+    prisma.employee.aggregate({
+      where: { active: true },
+      _sum: { salary: true },
+      _count: true,
+      _avg: { salary: true },
+    }),
   ]);
 
   return (
     <>
       <PageHeader
         title="Funcionários"
-        subtitle="Recursos humanos e folha de pagamento"
+        subtitle="Recursos humanos, acessos ao sistema e folha de pagamento"
         actions={
           <>
             <ExportCsvButton entity="funcionarios" />
@@ -103,6 +119,7 @@ export default async function FuncionariosPage({ searchParams }: { searchParams:
                 <th>Cargo</th>
                 <th>Departamento</th>
                 <th>Contato</th>
+                <th>Acesso / Permissões</th>
                 <th>Admissão</th>
                 <th className="num">Salário</th>
                 <th>Status</th>
@@ -110,38 +127,63 @@ export default async function FuncionariosPage({ searchParams }: { searchParams:
               </tr>
             </thead>
             <tbody>
-              {employees.map((e) => (
-                <tr key={e.id}>
-                  <td className="bold">
-                    <Link href={`/funcionarios/${e.id}`}>{e.name}</Link>
-                  </td>
-                  <td>{e.position}</td>
-                  <td>{e.department ?? "—"}</td>
-                  <td>
-                    <div>{e.email ?? "—"}</div>
-                    <div className="muted small">{e.phone}</div>
-                  </td>
-                  <td>{fmtDate(e.hireDate)}</td>
-                  <td className="num">{brl(e.salary)}</td>
-                  <td>
-                    <ActiveBadge active={e.active} />
-                  </td>
-                  <td className="actions">
-                    <Link className="btn sm secondary" href={`/funcionarios/${e.id}`}>
-                      Editar
-                    </Link>
-                    <ConfirmButton
-                      action={deleteEmployee.bind(null, e.id)}
-                      label="Excluir"
-                      className="btn sm danger"
-                      confirmText={`Excluir o funcionário "${e.name}"?`}
-                    />
-                  </td>
-                </tr>
-              ))}
+              {employees.map((e) => {
+                const hasLogin = Boolean(e.user && e.user.active);
+                const role = e.user?.role ?? "FUNCIONARIO";
+                const perms = parsePermissions(e.user?.permissions ?? e.permissions, role);
+                return (
+                  <tr key={e.id}>
+                    <td className="bold">
+                      <Link href={`/funcionarios/${e.id}`}>{e.name}</Link>
+                    </td>
+                    <td>{e.position}</td>
+                    <td>{e.department ?? "—"}</td>
+                    <td>
+                      <div>{e.email ?? "—"}</div>
+                      <div className="muted small">{e.phone}</div>
+                    </td>
+                    <td>
+                      {hasLogin ? (
+                        <div>
+                          <span className="badge green">
+                            <KeyRound size={11} /> {role === "ADMIN" ? "Admin (Total)" : "Login Ativo"}
+                          </span>
+                          <div className="muted small" style={{ marginTop: 3 }}>
+                            <Shield size={11} className="icon-inline" /> {perms.length} de {ALL_MODULE_KEYS.length}{" "}
+                            módulos
+                          </div>
+                        </div>
+                      ) : (
+                        <div>
+                          <span className="badge gray">Sem login</span>
+                          <div className="muted small" style={{ marginTop: 3 }}>
+                            {perms.length} módulos pré-definidos
+                          </div>
+                        </div>
+                      )}
+                    </td>
+                    <td>{fmtDate(e.hireDate)}</td>
+                    <td className="num">{brl(e.salary)}</td>
+                    <td>
+                      <ActiveBadge active={e.active} />
+                    </td>
+                    <td className="actions">
+                      <Link className="btn sm secondary" href={`/funcionarios/${e.id}`}>
+                        Editar / Acessos
+                      </Link>
+                      <ConfirmButton
+                        action={deleteEmployee.bind(null, e.id)}
+                        label="Excluir"
+                        className="btn sm danger"
+                        confirmText={`Excluir o funcionário "${e.name}"?`}
+                      />
+                    </td>
+                  </tr>
+                );
+              })}
               {employees.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="empty">
+                  <td colSpan={9} className="empty">
                     Nenhum funcionário encontrado.
                   </td>
                 </tr>
