@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
@@ -32,6 +32,7 @@ export async function saveCompanySettings(_prev: FormState, fd: FormData): Promi
   } catch (e) {
     return toFormError(e);
   }
+  revalidateTag("company-settings", "max");
   revalidatePath("/", "layout");
   revalidatePath("/configuracoes");
   return { success: "Configurações da empresa atualizadas com sucesso." };

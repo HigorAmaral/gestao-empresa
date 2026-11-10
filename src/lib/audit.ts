@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import { prisma } from "./prisma";
 import type { Session } from "./token";
 
@@ -24,8 +25,12 @@ export async function logAudit(
   }
 }
 
-export async function getCompanySettings() {
-  const existing = await prisma.companySettings.findUnique({ where: { id: 1 } });
-  if (existing) return existing;
-  return prisma.companySettings.create({ data: { id: 1 } });
-}
+export const getCompanySettings = unstable_cache(
+  async () => {
+    const existing = await prisma.companySettings.findUnique({ where: { id: 1 } });
+    if (existing) return existing;
+    return prisma.companySettings.create({ data: { id: 1 } });
+  },
+  ["company-settings"],
+  { tags: ["company-settings"], revalidate: 3600 },
+);
