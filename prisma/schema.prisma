@@ -29,6 +29,7 @@ model User {
   auditLogs     AuditLog[]
   receipts      GoodsReceipt[]
   productionOrders ProductionOrder[]
+  invoices      Invoice[]
 }
 
 model CompanySettings {
@@ -51,6 +52,15 @@ model CompanySettings {
   pixKey            String?  @default("00.000.000/0001-00")
   monthlyGoal       Float    @default(30000)
   receiptFooter     String?  @default("Obrigado pela preferência! Guarde este comprovante para garantia.")
+  taxRegime         String?  @default("1") // 1=Simples Nacional, 2=Simples excesso, 3=Regime Normal
+  nfeEnvironment    String?  @default("HOMOLOGACAO") // HOMOLOGACAO (2) | PRODUCAO (1)
+  nfeSeries         Int?     @default(1)
+  nfeNextNumber     Int?     @default(1)
+  nfeApiProvider    String?  @default("FOCUS_NFE") // FOCUS_NFE | NUVEM_FISCAL | DIRETO_SEFAZ
+  nfeApiKey         String?
+  nfeCscId          String?
+  nfeCscToken       String?
+  ibgeCityCode      String?  @default("3550308") // Código IBGE do município
   updatedAt         DateTime @updatedAt
 }
 
@@ -77,12 +87,16 @@ model Client {
   address   String?
   city      String?
   state     String?
+  zipCode   String?
+  ie        String?  // Inscrição Estadual (ou ISENTO)
+  ieIndicator String? @default("9") // 1=Contribuinte, 2=Isento, 9=Não Contribuinte
   notes     String?
   active    Boolean  @default(true)
   createdAt DateTime @default(now())
 
   sales         Sale[]
   serviceOrders ServiceOrder[]
+  invoices      Invoice[]
 }
 
 model Supplier {
@@ -114,6 +128,11 @@ model Product {
   salePrice   Float     @default(0)
   stock       Float     @default(0)
   minStock    Float     @default(0)
+  ncm         String?   @default("00000000") // NCM obrigatório 8 dígitos para NF-e
+  cest        String?   // CEST 7 dígitos (se aplicável)
+  cfop        String?   @default("5102")     // CFOP padrão de venda
+  origin      String?   @default("0")        // 0=Nacional, 1=Importação direta, 2=Adquirida mercado interno
+  csosn       String?   @default("102")      // Simples Nacional: 102 (sem permissão de crédito)
   active      Boolean   @default(true)
   supplierId  Int?
   supplier    Supplier? @relation(fields: [supplierId], references: [id], onDelete: SetNull)
@@ -129,6 +148,7 @@ model Product {
   productionOrderItems ProductionOrderItem[] @relation("ProductRawMaterial")
   recipeItems          ProductRecipeItem[]   @relation("ProductRecipe")
   usedInRecipes        ProductRecipeItem[]   @relation("ProductRecipeComponent")
+  invoiceItems         InvoiceItem[]
 }
 
 model Employee {
@@ -171,6 +191,7 @@ model Sale {
 
   items     SaleItem[]
   financial FinancialEntry[]
+  invoices  Invoice[]
 }
 
 model SaleItem {
@@ -412,4 +433,87 @@ model ProductionMachine {
   active    Boolean  @default(true)
   createdAt DateTime @default(now())
 }
+
+// ---------- Notas Fiscais Eletrônicas (NF-e Modelo 55) ----------
+
+model Invoice {
+  id              Int       @id @default(autoincrement())
+  number          Int       // Número da NF-e (1, 2, 3...)
+  series          Int       @default(1)
+  type            String    @default("SAIDA") // SAIDA (1) | ENTRADA (0)
+  status          String    @default("RASCUNHO") // RASCUNHO | PROCESSANDO | AUTORIZADA | CANCELADA | REJEITADA
+  environment     String    @default("HOMOLOGACAO") // HOMOLOGACAO (2) | PRODUCAO (1)
+
+  saleId          Int?
+  sale            Sale?     @relation(fields: [saleId], references: [id], onDelete: SetNull)
+  clientId        Int?
+  client          Client?   @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  userId          Int?
+  user            User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  // SEFAZ / Protocolo Oficial
+  accessKey       String?   @unique // Chave de acesso de 44 dígitos
+  protocol        String?   // Número do protocolo de autorização SEFAZ (ex: 135260000000001)
+  authorizedAt    DateTime?
+  cStat           String?   // Código status SEFAZ (100 = Autorizado)
+  xMotivo         String?   // Motivo de status SEFAZ
+  xmlUrl          String?   // URL para download do XML
+  danfeUrl        String?   // URL do PDF DANFE
+  xmlContent      String?   // XML oficial assinado com tag protNFe
+
+  canceledAt      DateTime?
+  cancelReason    String?
+
+  // Valores Totais
+  totalProducts   Float     @default(0)
+  totalDiscount   Float     @default(0)
+  totalFreight    Float     @default(0)
+  totalInvoice    Float     @default(0)
+
+  // Tributos
+  baseIcms        Float     @default(0)
+  valueIcms       Float     @default(0)
+  valuePis        Float     @default(0)
+  valueCofins     Float     @default(0)
+  approxTaxTotal  Float     @default(0) // Lei da Transparência IBPT
+
+  // Transporte
+  freightModality String    @default("9") // 9=Sem Frete, 0=Remetente (CIF), 1=Destinatário (FOB)
+  carrierName     String?
+
+  fiscalNotes     String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  items           InvoiceItem[]
+}
+
+model InvoiceItem {
+  id          Int     @id @default(autoincrement())
+  invoiceId   Int
+  invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  productId   Int
+  product     Product @relation(fields: [productId], references: [id])
+  itemNumber  Int     @default(1)
+
+  sku         String?
+  name        String
+  ncm         String  @default("00000000")
+  cfop        String  @default("5102")
+  unit        String  @default("UN")
+  quantity    Float
+  unitPrice   Float
+  totalPrice  Float
+  discount    Float   @default(0)
+
+  origin      String  @default("0")
+  csosn       String? @default("102")
+  icmsRate    Float   @default(0)
+  icmsValue   Float   @default(0)
+  pisRate     Float   @default(0)
+  pisValue    Float   @default(0)
+  cofinsRate  Float   @default(0)
+  cofinsValue Float   @default(0)
+}
+
 

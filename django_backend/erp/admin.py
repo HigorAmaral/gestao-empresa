@@ -24,6 +24,8 @@ from .models import (
     ProductionOrderItem,
     ProductRecipeItem,
     ProductionMachine,
+    Invoice,
+    InvoiceItem,
     Supplier,
 )
 
@@ -260,6 +262,20 @@ class ProductionMachineAdmin(admin.ModelAdmin):
     list_display = ("name", "code", "category", "location", "active", "created_at")
     list_filter = ("category", "active")
     search_fields = ("name", "code", "category", "location")
+
+
+class InvoiceItemInline(admin.TabularInline):
+    model = InvoiceItem
+    extra = 1
+
+
+@admin.register(Invoice)
+class InvoiceAdmin(admin.ModelAdmin):
+    list_display = ("number", "series", "client", "total_invoice", "status", "environment", "access_key", "created_at")
+    list_filter = ("status", "environment", "series")
+    search_fields = ("number", "access_key", "protocol", "client__name", "client__document")
+    inlines = [InvoiceItemInline]
+
 
 
 

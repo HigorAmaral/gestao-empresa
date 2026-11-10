@@ -144,16 +144,108 @@ export async function ensureStockLocationTables(): Promise<void> {
       );
     `);
 
+    // 9. Cria a tabela Invoice (Nota Fiscal Eletrônica - NF-e Modelo 55)
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "Invoice" (
+        "id" SERIAL PRIMARY KEY,
+        "number" INTEGER NOT NULL,
+        "series" INTEGER NOT NULL DEFAULT 1,
+        "type" VARCHAR(20) NOT NULL DEFAULT 'SAIDA',
+        "status" VARCHAR(50) NOT NULL DEFAULT 'RASCUNHO',
+        "environment" VARCHAR(30) NOT NULL DEFAULT 'HOMOLOGACAO',
+        "saleId" INTEGER,
+        "clientId" INTEGER,
+        "userId" INTEGER,
+        "accessKey" VARCHAR(60) UNIQUE,
+        "protocol" VARCHAR(60),
+        "authorizedAt" TIMESTAMP(3),
+        "cStat" VARCHAR(20),
+        "xMotivo" TEXT,
+        "xmlUrl" TEXT,
+        "danfeUrl" TEXT,
+        "xmlContent" TEXT,
+        "canceledAt" TIMESTAMP(3),
+        "cancelReason" TEXT,
+        "totalProducts" DOUBLE PRECISION NOT NULL DEFAULT 0,
+        "totalDiscount" DOUBLE PRECISION NOT NULL DEFAULT 0,
+        "totalFreight" DOUBLE PRECISION NOT NULL DEFAULT 0,
+        "totalInvoice" DOUBLE PRECISION NOT NULL DEFAULT 0,
+        "baseIcms" DOUBLE PRECISION NOT NULL DEFAULT 0,
+        "valueIcms" DOUBLE PRECISION NOT NULL DEFAULT 0,
+        "valuePis" DOUBLE PRECISION NOT NULL DEFAULT 0,
+        "valueCofins" DOUBLE PRECISION NOT NULL DEFAULT 0,
+        "approxTaxTotal" DOUBLE PRECISION NOT NULL DEFAULT 0,
+        "freightModality" VARCHAR(10) NOT NULL DEFAULT '9',
+        "carrierName" VARCHAR(200),
+        "fiscalNotes" TEXT,
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "Invoice_saleId_fkey" FOREIGN KEY ("saleId") REFERENCES "Sale"("id") ON DELETE SET NULL,
+        CONSTRAINT "Invoice_clientId_fkey" FOREIGN KEY ("clientId") REFERENCES "Client"("id") ON DELETE SET NULL,
+        CONSTRAINT "Invoice_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE SET NULL
+      );
+    `);
+
+    // 10. Cria a tabela InvoiceItem
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "InvoiceItem" (
+        "id" SERIAL PRIMARY KEY,
+        "invoiceId" INTEGER NOT NULL,
+        "productId" INTEGER NOT NULL,
+        "itemNumber" INTEGER NOT NULL DEFAULT 1,
+        "sku" VARCHAR(100),
+        "name" VARCHAR(255) NOT NULL,
+        "ncm" VARCHAR(20) NOT NULL DEFAULT '00000000',
+        "cfop" VARCHAR(10) NOT NULL DEFAULT '5102',
+        "unit" VARCHAR(20) NOT NULL DEFAULT 'UN',
+        "quantity" DOUBLE PRECISION NOT NULL,
+        "unitPrice" DOUBLE PRECISION NOT NULL,
+        "totalPrice" DOUBLE PRECISION NOT NULL,
+        "discount" DOUBLE PRECISION NOT NULL DEFAULT 0,
+        "origin" VARCHAR(10) NOT NULL DEFAULT '0',
+        "csosn" VARCHAR(10) DEFAULT '102',
+        "icmsRate" DOUBLE PRECISION NOT NULL DEFAULT 0,
+        "icmsValue" DOUBLE PRECISION NOT NULL DEFAULT 0,
+        "pisRate" DOUBLE PRECISION NOT NULL DEFAULT 0,
+        "pisValue" DOUBLE PRECISION NOT NULL DEFAULT 0,
+        "cofinsRate" DOUBLE PRECISION NOT NULL DEFAULT 0,
+        "cofinsValue" DOUBLE PRECISION NOT NULL DEFAULT 0,
+        CONSTRAINT "InvoiceItem_invoiceId_fkey" FOREIGN KEY ("invoiceId") REFERENCES "Invoice"("id") ON DELETE CASCADE,
+        CONSTRAINT "InvoiceItem_productId_fkey" FOREIGN KEY ("productId") REFERENCES "Product"("id") ON DELETE RESTRICT
+      );
+    `);
+
     // Índices
     await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "ProductStockLocation_productId_idx" ON "ProductStockLocation"("productId");`);
     await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "ProductStockLocation_locationId_idx" ON "ProductStockLocation"("locationId");`);
     await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "ProductRecipeItem_productId_idx" ON "ProductRecipeItem"("productId");`);
     await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "GoodsReceipt_code_idx" ON "GoodsReceipt"("code");`);
     await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "ProductionOrder_code_idx" ON "ProductionOrder"("code");`);
+    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "Invoice_number_idx" ON "Invoice"("number");`);
+    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "Invoice_accessKey_idx" ON "Invoice"("accessKey");`);
     await prisma.$executeRawUnsafe(`ALTER TABLE "CompanySettings" ADD COLUMN IF NOT EXISTS "logoUrl" TEXT;`).catch(() => {});
     await prisma.$executeRawUnsafe(`ALTER TABLE "CompanySettings" ADD COLUMN IF NOT EXISTS "primaryColor" VARCHAR(50);`).catch(() => {});
     await prisma.$executeRawUnsafe(`ALTER TABLE "CompanySettings" ADD COLUMN IF NOT EXISTS "sidebarColor" VARCHAR(50);`).catch(() => {});
     await prisma.$executeRawUnsafe(`ALTER TABLE "CompanySettings" ADD COLUMN IF NOT EXISTS "accentColor" VARCHAR(50);`).catch(() => {});
+    await prisma.$executeRawUnsafe(`ALTER TABLE "CompanySettings" ADD COLUMN IF NOT EXISTS "taxRegime" VARCHAR(10);`).catch(() => {});
+    await prisma.$executeRawUnsafe(`ALTER TABLE "CompanySettings" ADD COLUMN IF NOT EXISTS "nfeEnvironment" VARCHAR(30);`).catch(() => {});
+    await prisma.$executeRawUnsafe(`ALTER TABLE "CompanySettings" ADD COLUMN IF NOT EXISTS "nfeSeries" INTEGER DEFAULT 1;`).catch(() => {});
+    await prisma.$executeRawUnsafe(`ALTER TABLE "CompanySettings" ADD COLUMN IF NOT EXISTS "nfeNextNumber" INTEGER DEFAULT 1;`).catch(() => {});
+    await prisma.$executeRawUnsafe(`ALTER TABLE "CompanySettings" ADD COLUMN IF NOT EXISTS "nfeApiProvider" VARCHAR(50);`).catch(() => {});
+    await prisma.$executeRawUnsafe(`ALTER TABLE "CompanySettings" ADD COLUMN IF NOT EXISTS "nfeApiKey" TEXT;`).catch(() => {});
+    await prisma.$executeRawUnsafe(`ALTER TABLE "CompanySettings" ADD COLUMN IF NOT EXISTS "nfeCscId" VARCHAR(50);`).catch(() => {});
+    await prisma.$executeRawUnsafe(`ALTER TABLE "CompanySettings" ADD COLUMN IF NOT EXISTS "nfeCscToken" VARCHAR(100);`).catch(() => {});
+    await prisma.$executeRawUnsafe(`ALTER TABLE "CompanySettings" ADD COLUMN IF NOT EXISTS "ibgeCityCode" VARCHAR(20);`).catch(() => {});
+
+    await prisma.$executeRawUnsafe(`ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "ncm" VARCHAR(20);`).catch(() => {});
+    await prisma.$executeRawUnsafe(`ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "cest" VARCHAR(20);`).catch(() => {});
+    await prisma.$executeRawUnsafe(`ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "cfop" VARCHAR(10);`).catch(() => {});
+    await prisma.$executeRawUnsafe(`ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "origin" VARCHAR(10);`).catch(() => {});
+    await prisma.$executeRawUnsafe(`ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "csosn" VARCHAR(10);`).catch(() => {});
+
+    await prisma.$executeRawUnsafe(`ALTER TABLE "Client" ADD COLUMN IF NOT EXISTS "ie" VARCHAR(50);`).catch(() => {});
+    await prisma.$executeRawUnsafe(`ALTER TABLE "Client" ADD COLUMN IF NOT EXISTS "ieIndicator" VARCHAR(10);`).catch(() => {});
+    await prisma.$executeRawUnsafe(`ALTER TABLE "Client" ADD COLUMN IF NOT EXISTS "zipCode" VARCHAR(20);`).catch(() => {});
 
     // Popula máquinas padrão caso vazio
     const machineCount = await prisma.productionMachine.count().catch(() => 0);
@@ -300,6 +392,68 @@ export async function ensureStockLocationTables(): Promise<void> {
           "location" TEXT,
           "active" BOOLEAN NOT NULL DEFAULT 1,
           "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+      await prisma.$executeRawUnsafe(`
+        CREATE TABLE IF NOT EXISTS "Invoice" (
+          "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+          "number" INTEGER NOT NULL,
+          "series" INTEGER NOT NULL DEFAULT 1,
+          "type" TEXT NOT NULL DEFAULT 'SAIDA',
+          "status" TEXT NOT NULL DEFAULT 'RASCUNHO',
+          "environment" TEXT NOT NULL DEFAULT 'HOMOLOGACAO',
+          "saleId" INTEGER REFERENCES "Sale"("id") ON DELETE SET NULL,
+          "clientId" INTEGER REFERENCES "Client"("id") ON DELETE SET NULL,
+          "userId" INTEGER REFERENCES "User"("id") ON DELETE SET NULL,
+          "accessKey" TEXT UNIQUE,
+          "protocol" TEXT,
+          "authorizedAt" DATETIME,
+          "cStat" TEXT,
+          "xMotivo" TEXT,
+          "xmlUrl" TEXT,
+          "danfeUrl" TEXT,
+          "xmlContent" TEXT,
+          "canceledAt" DATETIME,
+          "cancelReason" TEXT,
+          "totalProducts" REAL NOT NULL DEFAULT 0,
+          "totalDiscount" REAL NOT NULL DEFAULT 0,
+          "totalFreight" REAL NOT NULL DEFAULT 0,
+          "totalInvoice" REAL NOT NULL DEFAULT 0,
+          "baseIcms" REAL NOT NULL DEFAULT 0,
+          "valueIcms" REAL NOT NULL DEFAULT 0,
+          "valuePis" REAL NOT NULL DEFAULT 0,
+          "valueCofins" REAL NOT NULL DEFAULT 0,
+          "approxTaxTotal" REAL NOT NULL DEFAULT 0,
+          "freightModality" TEXT NOT NULL DEFAULT '9',
+          "carrierName" TEXT,
+          "fiscalNotes" TEXT,
+          "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+      await prisma.$executeRawUnsafe(`
+        CREATE TABLE IF NOT EXISTS "InvoiceItem" (
+          "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+          "invoiceId" INTEGER NOT NULL REFERENCES "Invoice"("id") ON DELETE CASCADE,
+          "productId" INTEGER NOT NULL REFERENCES "Product"("id"),
+          "itemNumber" INTEGER NOT NULL DEFAULT 1,
+          "sku" TEXT,
+          "name" TEXT NOT NULL,
+          "ncm" TEXT NOT NULL DEFAULT '00000000',
+          "cfop" TEXT NOT NULL DEFAULT '5102',
+          "unit" TEXT NOT NULL DEFAULT 'UN',
+          "quantity" REAL NOT NULL,
+          "unitPrice" REAL NOT NULL,
+          "totalPrice" REAL NOT NULL,
+          "discount" REAL NOT NULL DEFAULT 0,
+          "origin" TEXT NOT NULL DEFAULT '0',
+          "csosn" TEXT DEFAULT '102',
+          "icmsRate" REAL NOT NULL DEFAULT 0,
+          "icmsValue" REAL NOT NULL DEFAULT 0,
+          "pisRate" REAL NOT NULL DEFAULT 0,
+          "pisValue" REAL NOT NULL DEFAULT 0,
+          "cofinsRate" REAL NOT NULL DEFAULT 0,
+          "cofinsValue" REAL NOT NULL DEFAULT 0
         );
       `);
       tablesChecked = true;

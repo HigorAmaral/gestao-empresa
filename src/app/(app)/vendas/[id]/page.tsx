@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { MessageCircle, Printer } from "lucide-react";
+import { Download, FileCheck, FileText, MessageCircle, Printer } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { brl, fmtDate, fmtDateTime, PAYMENT_METHODS, toInputDate, todayInput } from "@/lib/format";
 import { buildWhatsAppUrl, saleWhatsAppMessage } from "@/lib/whatsapp";
@@ -8,6 +8,7 @@ import { FlashMessages, PageHeader, StatusBadge } from "@/components/ui";
 import { ActionForm, ConfirmButton } from "@/components/Forms";
 import { ItemsEditor } from "@/components/ItemsEditor";
 import { cancelSale, confirmSale, deleteSale, duplicateSale, saveSale } from "../actions";
+import { emitNfeFromSale } from "@/app/(app)/nfe/actions";
 
 type SP = Promise<Record<string, string | string[] | undefined>>;
 
@@ -25,7 +26,13 @@ export default async function VendaPage({
     ? null
     : await prisma.sale.findUnique({
         where: { id: Number(id) },
-        include: { items: { include: { product: true } }, client: true, user: true, financial: true },
+        include: {
+          items: { include: { product: true } },
+          client: true,
+          user: true,
+          financial: true,
+          invoices: { orderBy: { id: "desc" } },
+        },
       });
   if (!isNew && !sale) notFound();
 
@@ -95,6 +102,20 @@ export default async function VendaPage({
               <Link className="btn secondary" href={`/vendas/${sale.id}/recibo`}>
                 <Printer size={15} /> Recibo / Pedido
               </Link>
+              {sale.invoices && sale.invoices.length > 0 ? (
+                <Link className="btn secondary" href={`/nfe/${sale.invoices[0].id}`}>
+                  <FileCheck size={15} /> NF-e #{sale.invoices[0].number}
+                </Link>
+              ) : (
+                sale.status === "CONFIRMADA" && (
+                  <ConfirmButton
+                    action={emitNfeFromSale.bind(null, sale.id)}
+                    label="Emitir NF-e"
+                    className="btn"
+                    confirmText={`Emitir Nota Fiscal Eletrônica (NF-e) para a Venda #${sale.id}?`}
+                  />
+                )
+              )}
               <form action={duplicateSale.bind(null, sale.id)} className="inline-form">
                 <button type="submit" className="btn secondary" title="Criar novo orçamento com os mesmos itens">
                   Duplicar Pedido
@@ -129,6 +150,50 @@ export default async function VendaPage({
         }
       />
       <FlashMessages sp={sp} />
+
+      {sale && sale.invoices && sale.invoices.length > 0 && (
+        <div
+          style={{
+            background: "#f0fdf4",
+            border: "1px solid #bbf7d0",
+            borderRadius: 8,
+            padding: "12px 16px",
+            marginBottom: 20,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            flexWrap: "wrap",
+            gap: 12,
+          }}
+        >
+          <div>
+            <div style={{ fontWeight: 700, color: "#166534", fontSize: 14 }}>
+              ✓ Nota Fiscal Eletrônica (NF-e nº {sale.invoices[0].number}) Emitida
+            </div>
+            {sale.invoices[0].accessKey && (
+              <div style={{ fontSize: 12, fontFamily: "monospace", color: "#15803d", marginTop: 2 }}>
+                Chave SEFAZ: {sale.invoices[0].accessKey}
+              </div>
+            )}
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <Link href={`/nfe/${sale.invoices[0].id}/danfe`} className="btn secondary" style={{ fontSize: 12.5 }}>
+              <Printer size={14} /> Imprimir DANFE
+            </Link>
+            <a
+              href={`/nfe/${sale.invoices[0].id}/xml`}
+              download={`NFe-${sale.invoices[0].accessKey || sale.invoices[0].number}.xml`}
+              className="btn secondary"
+              style={{ fontSize: 12.5 }}
+            >
+              <Download size={14} /> Baixar XML
+            </a>
+            <Link href={`/nfe/${sale.invoices[0].id}`} className="btn secondary" style={{ fontSize: 12.5 }}>
+              Ver Detalhes da NF-e →
+            </Link>
+          </div>
+        </div>
+      )}
 
       {editable ? (
         <div className="card">

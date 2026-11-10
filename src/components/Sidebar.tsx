@@ -7,6 +7,7 @@ import {
   BarChart3,
   Building2,
   Factory,
+  FileText,
   History,
   LayoutDashboard,
   LogOut,
@@ -52,6 +53,7 @@ const SECTIONS: { title: string; items: Item[] }[] = [
     title: "Comercial & Serviços",
     items: [
       { href: "/vendas", label: "Vendas", Icon: ShoppingCart, moduleKey: "vendas" },
+      { href: "/nfe", label: "Notas Fiscais (NF-e)", Icon: FileText, moduleKey: "vendas" },
       { href: "/os", label: "Ordens de Serviço", Icon: Wrench, moduleKey: "os", alertKey: "os" },
       { href: "/producao", label: "Produção (OP)", Icon: Factory, moduleKey: "os" },
       { href: "/clientes", label: "Clientes", Icon: Users, moduleKey: "clientes" },

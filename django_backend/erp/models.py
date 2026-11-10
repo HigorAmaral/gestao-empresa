@@ -785,4 +785,70 @@ class ProductionMachine(models.Model):
         return f"{self.name} ({self.code or 'Sem tag'})"
 
 
+class Invoice(models.Model):
+    id = models.AutoField(primary_key=True)
+    number = models.IntegerField("Número da NF-e")
+    series = models.IntegerField("Série", default=1)
+    type = models.CharField("Tipo", max_length=20, default="SAIDA")
+    status = models.CharField("Status", max_length=50, default="RASCUNHO")
+    environment = models.CharField("Ambiente", max_length=30, default="HOMOLOGACAO")
+    sale = models.ForeignKey(Sale, verbose_name="Venda", on_delete=models.SET_NULL, null=True, blank=True, db_column="saleId", related_name="invoices")
+    client = models.ForeignKey(Client, verbose_name="Cliente", on_delete=models.SET_NULL, null=True, blank=True, db_column="clientId", related_name="invoices")
+    user = models.ForeignKey(AppUser, verbose_name="Usuário", on_delete=models.SET_NULL, null=True, blank=True, db_column="userId", related_name="invoices")
+    access_key = models.CharField("Chave de Acesso (44 dígitos)", max_length=60, unique=True, null=True, blank=True, db_column="accessKey")
+    protocol = models.CharField("Protocolo SEFAZ", max_length=60, null=True, blank=True)
+    authorized_at = PrismaDateTimeField("Autorizada em", null=True, blank=True, db_column="authorizedAt")
+    c_stat = models.CharField("cStat", max_length=20, null=True, blank=True, db_column="cStat")
+    x_motivo = models.TextField("xMotivo", null=True, blank=True, db_column="xMotivo")
+    xml_url = models.TextField("URL do XML", null=True, blank=True, db_column="xmlUrl")
+    danfe_url = models.TextField("URL do DANFE", null=True, blank=True, db_column="danfeUrl")
+    xml_content = models.TextField("Conteúdo XML", null=True, blank=True, db_column="xmlContent")
+    canceled_at = PrismaDateTimeField("Cancelada em", null=True, blank=True, db_column="canceledAt")
+    cancel_reason = models.TextField("Motivo do Cancelamento", null=True, blank=True, db_column="cancelReason")
+    total_products = models.FloatField("Total dos Produtos", default=0, db_column="totalProducts")
+    total_discount = models.FloatField("Desconto", default=0, db_column="totalDiscount")
+    total_freight = models.FloatField("Frete", default=0, db_column="totalFreight")
+    total_invoice = models.FloatField("Total da Nota", default=0, db_column="totalInvoice")
+    approx_tax_total = models.FloatField("Tributos Aproximados (IBPT)", default=0, db_column="approxTaxTotal")
+    fiscal_notes = models.TextField("Observações Fiscais", null=True, blank=True, db_column="fiscalNotes")
+    created_at = PrismaDateTimeField("Criada em", default=timezone.now, db_column="createdAt")
+    updated_at = PrismaDateTimeField("Atualizada em", default=timezone.now, db_column="updatedAt")
+
+    class Meta:
+        db_table = "Invoice"
+        verbose_name = "Nota Fiscal Eletrônica (NF-e)"
+        verbose_name_plural = "Notas Fiscais Eletrônicas (NF-e)"
+        ordering = ["-number"]
+
+    def __str__(self):
+        return f"NF-e #{self.number} ({self.status}) — R$ {self.total_invoice:.2f}"
+
+
+class InvoiceItem(models.Model):
+    id = models.AutoField(primary_key=True)
+    invoice = models.ForeignKey(Invoice, verbose_name="Nota Fiscal", on_delete=models.CASCADE, db_column="invoiceId", related_name="items")
+    product = models.ForeignKey(Product, verbose_name="Produto", on_delete=models.PROTECT, db_column="productId", related_name="invoice_items")
+    item_number = models.IntegerField("Nº Item", default=1, db_column="itemNumber")
+    sku = models.CharField("SKU", max_length=100, null=True, blank=True)
+    name = models.CharField("Descrição do Produto", max_length=255)
+    ncm = models.CharField("NCM", max_length=20, default="00000000")
+    cfop = models.CharField("CFOP", max_length=10, default="5102")
+    unit = models.CharField("Unidade", max_length=20, default="UN")
+    quantity = models.FloatField("Quantidade")
+    unit_price = models.FloatField("Valor Unitário", db_column="unitPrice")
+    total_price = models.FloatField("Valor Total", db_column="totalPrice")
+    discount = models.FloatField("Desconto", default=0)
+    origin = models.CharField("Origem", max_length=10, default="0")
+    csosn = models.CharField("CSOSN", max_length=10, default="102", null=True, blank=True)
+
+    class Meta:
+        db_table = "InvoiceItem"
+        verbose_name = "Item da NF-e"
+        verbose_name_plural = "Itens da NF-e"
+
+    def __str__(self):
+        return f"{self.quantity}x {self.name} (NF-e #{self.invoice.number})"
+
+
+
 
