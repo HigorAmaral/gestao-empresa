@@ -4,6 +4,7 @@ import { UFS } from "@/lib/format";
 import { PageHeader } from "@/components/ui";
 import { ActionForm } from "@/components/Forms";
 import { saveCompanySettings } from "./actions";
+import { LogoUploadField } from "./LogoUploadField";
 
 export default async function ConfiguracoesPage() {
   await requireAdmin("configuracoes");
@@ -13,11 +14,16 @@ export default async function ConfiguracoesPage() {
     <>
       <PageHeader
         title="Configurações da Empresa"
-        subtitle="Estes dados aparecem no cabeçalho dos recibos, QR Code PIX, tela de login, barra lateral e metas do Dashboard"
+        subtitle="Estes dados e a logo aparecem no cabeçalho dos recibos, documentos (OP/OS), tela de login, barra lateral e metas do Dashboard"
       />
 
       <div className="card">
         <ActionForm action={saveCompanySettings} submitLabel="Salvar configurações">
+          {/* Seletor de Logo da Empresa */}
+          <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: "1px solid var(--border)" }}>
+            <LogoUploadField initialLogoUrl={company.logoUrl} />
+          </div>
+
           <div className="form-grid">
             <div className="field s6">
               <label>Razão Social *</label>

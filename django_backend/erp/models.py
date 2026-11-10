@@ -31,6 +31,7 @@ class CompanySettings(models.Model):
     id = models.IntegerField("ID", primary_key=True, default=1)
     name = models.CharField("Razão Social", max_length=255, default="GestãoPro Empresarial Ltda")
     trade_name = models.CharField("Nome Fantasia", max_length=255, blank=True, null=True, db_column="tradeName")
+    logo_url = models.TextField("URL ou Base64 da Logo", blank=True, null=True, db_column="logoUrl")
     document = models.CharField("CNPJ", max_length=40, blank=True, null=True)
     state_registration = models.CharField("Inscrição Estadual", max_length=60, blank=True, null=True, db_column="stateRegistration")
     email = models.EmailField("E-mail", max_length=200, blank=True, null=True)

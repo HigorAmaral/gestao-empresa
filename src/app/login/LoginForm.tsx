@@ -18,7 +18,15 @@ import {
 } from "lucide-react";
 import { login } from "./actions";
 
-export function LoginForm({ brandName, companyName }: { brandName: string; companyName: string }) {
+export function LoginForm({
+  brandName,
+  companyName,
+  logoUrl,
+}: {
+  brandName: string;
+  companyName: string;
+  logoUrl?: string | null;
+}) {
   const [state, action, pending] = useActionState(login, undefined);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -119,9 +127,25 @@ export function LoginForm({ brandName, companyName }: { brandName: string; compa
         {/* Coluna Direita: Formulário de Login Interativo */}
         <form className="login-card" action={action}>
           <div className="brand">
-            <div className="logo">
-              <Building2 size={23} />
-            </div>
+            {logoUrl ? (
+              <img
+                src={logoUrl}
+                alt={brandName}
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 10,
+                  background: "#ffffff",
+                  objectFit: "contain",
+                  padding: 3,
+                  border: "1px solid #e4e4e7",
+                }}
+              />
+            ) : (
+              <div className="logo">
+                <Building2 size={23} />
+              </div>
+            )}
             <div>
               <h1 style={{ fontSize: 23, color: "#09090b" }}>{brandName}</h1>
               <div style={{ fontSize: 12.5, color: "#71717a" }}>Acesse sua conta corporativa</div>

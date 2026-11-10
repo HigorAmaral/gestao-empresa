@@ -53,15 +53,24 @@ export default async function GoodsReceiptPrintPage({ params }: { params: Promis
       <div className="print-doc">
         {/* Cabeçalho da Empresa */}
         <div className="doc-header">
-          <div>
-            <h1>{company.tradeName || company.name}</h1>
-            <div className="small muted">{company.name}</div>
-            {company.document && <div className="small">CNPJ: {company.document}</div>}
-            <div className="small">
-              {[company.address, company.city, company.state].filter(Boolean).join(" · ")}
-            </div>
-            <div className="small">
-              {[company.phone, company.email].filter(Boolean).join(" · ")}
+          <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
+            {company.logoUrl && (
+              <img
+                src={company.logoUrl}
+                alt={company.tradeName || company.name}
+                style={{ maxHeight: 60, maxWidth: 140, objectFit: "contain", borderRadius: 4 }}
+              />
+            )}
+            <div>
+              <h1>{company.tradeName || company.name}</h1>
+              <div className="small muted">{company.name}</div>
+              {company.document && <div className="small">CNPJ: {company.document}</div>}
+              <div className="small">
+                {[company.address, company.city, company.state].filter(Boolean).join(" · ")}
+              </div>
+              <div className="small">
+                {[company.phone, company.email].filter(Boolean).join(" · ")}
+              </div>
             </div>
           </div>
           <div className="doc-title">

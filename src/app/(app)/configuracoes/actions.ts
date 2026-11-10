@@ -5,14 +5,17 @@ import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { num, reqStr, str, toFormError, type FormState } from "@/lib/form";
+import { ensureStockLocationTables } from "@/lib/stock-location";
 
 export async function saveCompanySettings(_prev: FormState, fd: FormData): Promise<FormState> {
   const session = await requireAdmin("configuracoes");
+  await ensureStockLocationTables();
   try {
     const monthlyGoal = Math.max(0, num(fd, "monthlyGoal", 30000));
     const data = {
       name: reqStr(fd, "name", "Razão Social"),
       tradeName: str(fd, "tradeName"),
+      logoUrl: str(fd, "logoUrl"),
       monthlyGoal,
       pixKey: str(fd, "pixKey"),
       document: str(fd, "document"),

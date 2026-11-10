@@ -8,5 +8,5 @@ export default async function LoginPage() {
   const brandName = company.tradeName?.trim() || company.name?.trim() || "GestãoPro";
   const companyName = company.name?.trim() || brandName;
 
-  return <LoginForm brandName={brandName} companyName={companyName} />;
+  return <LoginForm brandName={brandName} companyName={companyName} logoUrl={company.logoUrl} />;
 }

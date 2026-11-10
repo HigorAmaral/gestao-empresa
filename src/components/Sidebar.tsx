@@ -90,10 +90,12 @@ const SECTIONS: { title: string; items: Item[] }[] = [
 export function Sidebar({
   session,
   brandName = "GestãoPro",
+  logoUrl,
   alerts,
 }: {
   session: Session;
   brandName?: string;
+  logoUrl?: string | null;
   alerts?: SidebarAlerts;
 }) {
   const pathname = usePathname();
@@ -147,9 +149,25 @@ export function Sidebar({
       {/* Barra Superior Compacta (visível apenas no celular) */}
       <header className="mobile-topbar no-print">
         <div className="brand-left">
-          <div className="logo">
-            <Building2 size={17} strokeWidth={2.2} />
-          </div>
+          {logoUrl ? (
+            <img
+              src={logoUrl}
+              alt={brandName}
+              style={{
+                width: 30,
+                height: 30,
+                borderRadius: 7,
+                background: "#ffffff",
+                objectFit: "contain",
+                padding: 2,
+                flexShrink: 0,
+              }}
+            />
+          ) : (
+            <div className="logo">
+              <Building2 size={17} strokeWidth={2.2} />
+            </div>
+          )}
           <span>{brandName}</span>
         </div>
         <div className="row" style={{ gap: 8 }}>
@@ -178,9 +196,25 @@ export function Sidebar({
       <aside className={`sidebar ${drawerOpen ? "mobile-open" : ""}`}>
         <div className="brand">
           <div className="brand-left">
-            <div className="logo">
-              <Building2 size={18} strokeWidth={2.2} />
-            </div>
+            {logoUrl ? (
+              <img
+                src={logoUrl}
+                alt={brandName}
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: 7,
+                  background: "#ffffff",
+                  objectFit: "contain",
+                  padding: 2,
+                  flexShrink: 0,
+                }}
+              />
+            ) : (
+              <div className="logo">
+                <Building2 size={18} strokeWidth={2.2} />
+              </div>
+            )}
             <span>{brandName}</span>
           </div>
           <div className="row" style={{ gap: 6 }}>

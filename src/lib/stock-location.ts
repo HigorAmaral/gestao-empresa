@@ -121,6 +121,7 @@ export async function ensureStockLocationTables(): Promise<void> {
     await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "ProductStockLocation_locationId_idx" ON "ProductStockLocation"("locationId");`);
     await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "GoodsReceipt_code_idx" ON "GoodsReceipt"("code");`);
     await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "ProductionOrder_code_idx" ON "ProductionOrder"("code");`);
+    await prisma.$executeRawUnsafe(`ALTER TABLE "CompanySettings" ADD COLUMN IF NOT EXISTS "logoUrl" TEXT;`).catch(() => {});
 
     // Endereços padrão caso a tabela esteja totalmente vazia
     const count = await prisma.stockLocation.count().catch(() => 0);
@@ -219,6 +220,9 @@ export async function ensureStockLocationTables(): Promise<void> {
           "notes" TEXT
         );
       `);
+      try {
+        await prisma.$executeRawUnsafe(`ALTER TABLE "CompanySettings" ADD COLUMN "logoUrl" TEXT;`);
+      } catch {}
       tablesChecked = true;
     } catch (sqliteError) {
       console.error("Falha ao inicializar tabelas auxiliares:", pgError, sqliteError);

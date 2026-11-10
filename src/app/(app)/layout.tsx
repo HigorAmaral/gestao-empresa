@@ -14,7 +14,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <div className="app">
       <DynamicBrandTitle brandName={brandName} />
-      <Sidebar session={session} brandName={brandName} alerts={alerts} />
+      <Sidebar session={session} brandName={brandName} logoUrl={company.logoUrl} alerts={alerts} />
       <main className="main">{children}</main>
     </div>
   );
