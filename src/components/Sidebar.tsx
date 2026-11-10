@@ -9,6 +9,7 @@ import {
   History,
   LayoutDashboard,
   LogOut,
+  Menu,
   Moon,
   Package,
   Receipt,
@@ -23,6 +24,7 @@ import {
   Wallet,
   Warehouse,
   Wrench,
+  X,
   type LucideIcon,
 } from "lucide-react";
 import { logout } from "@/app/login/actions";
@@ -90,6 +92,7 @@ export function Sidebar({
   const pathname = usePathname();
   const isAdmin = session.role === "ADMIN";
   const [dark, setDark] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem("theme");
@@ -98,6 +101,11 @@ export function Sidebar({
       setDark(true);
     }
   }, []);
+
+  // Fecha o drawer ao mudar de rota no celular
+  useEffect(() => {
+    setDrawerOpen(false);
+  }, [pathname]);
 
   function toggleTheme() {
     const next = !dark;
@@ -114,65 +122,142 @@ export function Sidebar({
   const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
 
   return (
-    <aside className="sidebar">
-      <div className="brand">
+    <>
+      {/* Barra Superior Compacta (visível apenas no celular) */}
+      <header className="mobile-topbar no-print">
         <div className="brand-left">
           <div className="logo">
-            <Building2 size={18} strokeWidth={2.2} />
+            <Building2 size={17} strokeWidth={2.2} />
           </div>
           <span>{brandName}</span>
         </div>
+        <div className="row" style={{ gap: 8 }}>
+          <button
+            type="button"
+            className="theme-btn"
+            onClick={toggleTheme}
+            title={dark ? "Modo claro" : "Modo escuro"}
+          >
+            {dark ? <Sun size={15} /> : <Moon size={15} />}
+          </button>
+          <button
+            type="button"
+            className="theme-btn"
+            onClick={() => setDrawerOpen((v) => !v)}
+            aria-label="Abrir menu"
+          >
+            {drawerOpen ? <X size={17} /> : <Menu size={17} />}
+          </button>
+        </div>
+      </header>
+
+      {/* Backdrop do Drawer no celular */}
+      {drawerOpen && <div className="mobile-drawer-backdrop no-print" onClick={() => setDrawerOpen(false)} />}
+
+      <aside className={`sidebar ${drawerOpen ? "mobile-open" : ""}`}>
+        <div className="brand">
+          <div className="brand-left">
+            <div className="logo">
+              <Building2 size={18} strokeWidth={2.2} />
+            </div>
+            <span>{brandName}</span>
+          </div>
+          <div className="row" style={{ gap: 6 }}>
+            <button
+              type="button"
+              className="theme-btn"
+              onClick={toggleTheme}
+              title={dark ? "Alternar para modo claro (P&B)" : "Alternar para modo escuro (P&B)"}
+            >
+              {dark ? <Sun size={15} /> : <Moon size={15} />}
+            </button>
+            <button
+              type="button"
+              className="theme-btn mobile-close-btn"
+              onClick={() => setDrawerOpen(false)}
+              title="Fechar menu"
+            >
+              <X size={15} />
+            </button>
+          </div>
+        </div>
+
+        {/* Busca Global Instantânea (Ctrl + K) */}
+        <div style={{ padding: "10px 12px 2px" }}>
+          <GlobalSearch />
+        </div>
+
+        <nav>
+          {SECTIONS.map((section) => {
+            const items = section.items.filter((i) => !i.moduleKey || hasModuleAccess(session, i.moduleKey));
+            if (items.length === 0) return null;
+            return (
+              <div key={section.title}>
+                <div className="section">{section.title}</div>
+                {items.map(({ href, label, Icon, alertKey }) => {
+                  const count = alertKey && alerts ? alerts[alertKey] : 0;
+                  return (
+                    <Link key={href} href={href} className={isActive(href) ? "active" : ""}>
+                      <Icon size={17} strokeWidth={2} />
+                      <span style={{ flex: 1 }}>{label}</span>
+                      {count > 0 && <span className="sidebar-badge">{count}</span>}
+                    </Link>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </nav>
+        <div className="userbox">
+          <div className="name">{session.name}</div>
+          <div className="role">{isAdmin ? "Administrador" : "Funcionário"}</div>
+          <div className="links">
+            <Link href="/perfil">
+              <User size={13} /> Meu perfil
+            </Link>
+            <form action={logout}>
+              <button type="submit">
+                <LogOut size={13} /> Sair
+              </button>
+            </form>
+          </div>
+          <PwaInstallButton />
+        </div>
+      </aside>
+
+      {/* Barra Fixa Inferior Estilo App Nativo (visível apenas no celular) */}
+      <nav className="mobile-bottom-nav no-print">
+        <Link href="/" className={`mobile-nav-item ${pathname === "/" ? "active" : ""}`}>
+          <LayoutDashboard size={18} />
+          <span>Início</span>
+        </Link>
+        {hasModuleAccess(session, "vendas") && (
+          <Link href="/vendas" className={`mobile-nav-item ${pathname.startsWith("/vendas") ? "active" : ""}`}>
+            <ShoppingCart size={18} />
+            <span>Vendas</span>
+          </Link>
+        )}
+        {hasModuleAccess(session, "os") && (
+          <Link href="/os" className={`mobile-nav-item ${pathname.startsWith("/os") ? "active" : ""}`}>
+            <Wrench size={18} />
+            <span>OS {alerts && alerts.os > 0 ? `(${alerts.os})` : ""}</span>
+          </Link>
+        )}
+        {hasModuleAccess(session, "estoque") && (
+          <Link href="/estoque" className={`mobile-nav-item ${pathname.startsWith("/estoque") ? "active" : ""}`}>
+            <Warehouse size={18} />
+            <span>Estoque</span>
+          </Link>
+        )}
         <button
           type="button"
-          className="theme-btn"
-          onClick={toggleTheme}
-          title={dark ? "Alternar para modo claro (P&B)" : "Alternar para modo escuro (P&B)"}
+          className={`mobile-nav-item ${drawerOpen ? "active" : ""}`}
+          onClick={() => setDrawerOpen((v) => !v)}
         >
-          {dark ? <Sun size={15} /> : <Moon size={15} />}
+          <Menu size={18} />
+          <span>Menu</span>
         </button>
-      </div>
-
-      {/* Busca Global Instantânea (Ctrl + K) */}
-      <div style={{ padding: "10px 12px 2px" }}>
-        <GlobalSearch />
-      </div>
-
-      <nav>
-        {SECTIONS.map((section) => {
-          const items = section.items.filter((i) => !i.moduleKey || hasModuleAccess(session, i.moduleKey));
-          if (items.length === 0) return null;
-          return (
-            <div key={section.title}>
-              <div className="section">{section.title}</div>
-              {items.map(({ href, label, Icon, alertKey }) => {
-                const count = alertKey && alerts ? alerts[alertKey] : 0;
-                return (
-                  <Link key={href} href={href} className={isActive(href) ? "active" : ""}>
-                    <Icon size={17} strokeWidth={2} />
-                    <span style={{ flex: 1 }}>{label}</span>
-                    {count > 0 && <span className="sidebar-badge">{count}</span>}
-                  </Link>
-                );
-              })}
-            </div>
-          );
-        })}
       </nav>
-      <div className="userbox">
-        <div className="name">{session.name}</div>
-        <div className="role">{isAdmin ? "Administrador" : "Funcionário"}</div>
-        <div className="links">
-          <Link href="/perfil">
-            <User size={13} /> Meu perfil
-          </Link>
-          <form action={logout}>
-            <button type="submit">
-              <LogOut size={13} /> Sair
-            </button>
-          </form>
-        </div>
-        <PwaInstallButton />
-      </div>
-    </aside>
+    </>
   );
 }

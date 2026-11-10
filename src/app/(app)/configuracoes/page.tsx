@@ -13,7 +13,7 @@ export default async function ConfiguracoesPage() {
     <>
       <PageHeader
         title="Configurações da Empresa"
-        subtitle="Estes dados aparecem no cabeçalho dos recibos, tela de login, barra lateral e metas do Dashboard"
+        subtitle="Estes dados aparecem no cabeçalho dos recibos, QR Code PIX, tela de login, barra lateral e metas do Dashboard"
       />
 
       <div className="card">
@@ -37,15 +37,23 @@ export default async function ConfiguracoesPage() {
                 defaultValue={company.monthlyGoal ?? 30000}
               />
             </div>
-            <div className="field s4">
+            <div className="field s3">
               <label>CNPJ</label>
               <input name="document" defaultValue={company.document ?? ""} />
             </div>
-            <div className="field s4">
+            <div className="field s3">
               <label>Inscrição Estadual</label>
               <input name="stateRegistration" defaultValue={company.stateRegistration ?? ""} />
             </div>
-            <div className="field s4">
+            <div className="field s3">
+              <label>Chave PIX (para QR Code nos Recibos)</label>
+              <input
+                name="pixKey"
+                placeholder="CNPJ, CPF, E-mail, Celular ou Chave Aleatória"
+                defaultValue={company.pixKey ?? company.document ?? ""}
+              />
+            </div>
+            <div className="field s3">
               <label>Telefone / WhatsApp</label>
               <input name="phone" defaultValue={company.phone ?? ""} />
             </div>

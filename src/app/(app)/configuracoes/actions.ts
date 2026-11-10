@@ -14,6 +14,7 @@ export async function saveCompanySettings(_prev: FormState, fd: FormData): Promi
       name: reqStr(fd, "name", "Razão Social"),
       tradeName: str(fd, "tradeName"),
       monthlyGoal,
+      pixKey: str(fd, "pixKey"),
       document: str(fd, "document"),
       stateRegistration: str(fd, "stateRegistration"),
       email: str(fd, "email"),

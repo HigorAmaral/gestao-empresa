@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Prisma } from "@prisma/client";
-import { AlertTriangle, Plus } from "lucide-react";
+import { AlertTriangle, Plus, Tag } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { pageParams, spStr } from "@/lib/form";
 import { brl, num } from "@/lib/format";
@@ -49,6 +49,9 @@ export default async function ProdutosPage({ searchParams }: { searchParams: SP 
         subtitle="Catálogo de produtos e serviços"
         actions={
           <>
+            <Link className="btn secondary" href="/produtos/etiquetas">
+              <Tag size={15} /> Imprimir Etiquetas
+            </Link>
             <ExportCsvButton entity="produtos" />
             <Link className="btn" href="/produtos/novo">
               <Plus size={15} /> Novo produto
@@ -116,6 +119,13 @@ export default async function ProdutosPage({ searchParams }: { searchParams: SP 
                       <ActiveBadge active={p.active} />
                     </td>
                     <td className="actions">
+                      <Link
+                        className="btn sm secondary"
+                        href={`/produtos/etiquetas?id=${p.id}`}
+                        title="Imprimir etiqueta deste produto"
+                      >
+                        <Tag size={13} /> Etiqueta
+                      </Link>
                       <Link className="btn sm secondary" href={`/produtos/${p.id}`}>
                         Editar
                       </Link>

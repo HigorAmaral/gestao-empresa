@@ -194,3 +194,37 @@ export async function deleteSale(id: number) {
   revalidateAll();
   redirect("/vendas?ok=" + encodeURIComponent(`Venda #${id} excluída.`));
 }
+
+/** Duplica uma venda existente como um novo orçamento com os mesmos itens e cliente. */
+export async function duplicateSale(id: number) {
+  const session = await requireUser();
+  const orig = await prisma.sale.findUnique({ where: { id }, include: { items: true } });
+  if (!orig) redirect("/vendas");
+
+  const copy = await prisma.sale.create({
+    data: {
+      clientId: orig.clientId,
+      userId: session.userId,
+      date: new Date(),
+      status: "ORCAMENTO",
+      paymentMethod: orig.paymentMethod,
+      installments: orig.installments,
+      subtotal: orig.subtotal,
+      discount: orig.discount,
+      total: orig.total,
+      notes: orig.notes ? `${orig.notes} (Cópia da Venda #${orig.id})` : `Cópia da Venda #${orig.id}`,
+      items: {
+        create: orig.items.map((i) => ({
+          productId: i.productId,
+          quantity: i.quantity,
+          unitPrice: i.unitPrice,
+          total: i.total,
+        })),
+      },
+    },
+  });
+
+  await logAudit(session, "VENDAS", "CRIAR", `Duplicou a venda #${id} para o novo orçamento #${copy.id}`, copy.id);
+  revalidateAll();
+  redirect(`/vendas/${copy.id}?ok=` + encodeURIComponent(`Pedido #${id} duplicado como novo Orçamento #${copy.id}.`));
+}

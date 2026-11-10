@@ -7,7 +7,7 @@ import { buildWhatsAppUrl, saleWhatsAppMessage } from "@/lib/whatsapp";
 import { FlashMessages, PageHeader, StatusBadge } from "@/components/ui";
 import { ActionForm, ConfirmButton } from "@/components/Forms";
 import { ItemsEditor } from "@/components/ItemsEditor";
-import { cancelSale, confirmSale, deleteSale, saveSale } from "../actions";
+import { cancelSale, confirmSale, deleteSale, duplicateSale, saveSale } from "../actions";
 
 type SP = Promise<Record<string, string | string[] | undefined>>;
 
@@ -95,6 +95,11 @@ export default async function VendaPage({
               <Link className="btn secondary" href={`/vendas/${sale.id}/recibo`}>
                 <Printer size={15} /> Recibo / Pedido
               </Link>
+              <form action={duplicateSale.bind(null, sale.id)} className="inline-form">
+                <button type="submit" className="btn secondary" title="Criar novo orçamento com os mesmos itens">
+                  Duplicar Pedido
+                </button>
+              </form>
               {sale.status === "ORCAMENTO" && (
                 <ConfirmButton
                   action={confirmSale.bind(null, sale.id)}

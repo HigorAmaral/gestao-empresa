@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Prisma } from "@prisma/client";
-import { KeyRound, Plus, Shield } from "lucide-react";
+import { KeyRound, Plus, Printer, Shield } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
 import { pageParams, spStr } from "@/lib/form";
@@ -168,6 +168,13 @@ export default async function FuncionariosPage({ searchParams }: { searchParams:
                       <ActiveBadge active={e.active} />
                     </td>
                     <td className="actions">
+                      <Link
+                        className="btn sm secondary"
+                        href={`/funcionarios/${e.id}/recibo`}
+                        title="Imprimir Holerite / Recibo de Salário"
+                      >
+                        <Printer size={13} /> Holerite
+                      </Link>
                       <Link className="btn sm secondary" href={`/funcionarios/${e.id}`}>
                         Editar / Acessos
                       </Link>

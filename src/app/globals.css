@@ -162,11 +162,119 @@ h2 { font-size: 15px; font-weight: 600; display: flex; align-items: center; gap:
 .stat.warning { border-left: 3px dashed var(--muted); }
 .stat.success { border-left: 3px solid var(--text); }
 
+.mobile-topbar,
+.mobile-bottom-nav,
+.mobile-drawer-backdrop,
+.mobile-close-btn {
+  display: none;
+}
+
 @media (max-width: 1100px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } }
 @media (max-width: 800px) {
   .app { flex-direction: column; }
-  .sidebar { width: 100%; height: auto; position: static; }
-  .main { padding: 20px 16px; }
+  .mobile-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    background: var(--sidebar);
+    color: #fff;
+    border-bottom: 1px solid var(--sidebar-border);
+    position: sticky;
+    top: 0;
+    z-index: 900;
+  }
+  .mobile-topbar .brand-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 700;
+    font-size: 15px;
+  }
+  .mobile-topbar .logo {
+    width: 30px;
+    height: 30px;
+    border-radius: 7px;
+    background: #ffffff;
+    color: #09090b;
+    display: grid;
+    place-items: center;
+  }
+  .mobile-topbar .theme-btn {
+    background: #18181b;
+    border: 1px solid #27272a;
+    color: #e4e4e7;
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+  }
+  .mobile-drawer-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(2px);
+    z-index: 1100;
+  }
+  .mobile-close-btn {
+    display: grid !important;
+  }
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 280px;
+    max-width: 85vw;
+    height: 100vh;
+    z-index: 1200;
+    transform: translateX(-105%);
+    transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 20px 0 50px rgba(0, 0, 0, 0.5);
+  }
+  .sidebar.mobile-open {
+    transform: translateX(0);
+  }
+  .main {
+    padding: 18px 14px 86px;
+  }
+  .mobile-bottom-nav {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--sidebar);
+    border-top: 1px solid var(--sidebar-border);
+    z-index: 950;
+    padding: 4px 4px calc(4px + env(safe-area-inset-bottom, 0px));
+  }
+  .mobile-nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    padding: 6px 4px;
+    color: #a1a1aa;
+    font-size: 10.5px;
+    font-weight: 600;
+    background: transparent;
+    border: 0;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .mobile-nav-item:hover,
+  .mobile-nav-item.active {
+    color: #ffffff;
+    text-decoration: none;
+    background: #18181b;
+  }
 }
 
 /* ---------- Tabelas ---------- */
@@ -990,6 +1098,113 @@ textarea { min-height: 80px; resize: vertical; }
 .cmd-item:hover {
   background: var(--surface-subtle);
   border-color: var(--border);
+}
+
+/* ---------- QR Code PIX nos Recibos ---------- */
+.pix-receipt-box {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 14px 18px;
+  border: 1.5px solid #09090b;
+  border-radius: 10px;
+  background: #fafafa;
+  color: #09090b;
+}
+.pix-qr-frame {
+  flex-shrink: 0;
+  background: #ffffff;
+  border: 1px solid #d4d4d8;
+  border-radius: 8px;
+  padding: 6px;
+  display: grid;
+  place-items: center;
+}
+.pix-info {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ---------- Etiquetas de Produtos / Gôndola ---------- */
+.labels-sheet {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 14px;
+}
+.price-label-card {
+  background: #ffffff;
+  color: #09090b;
+  border: 1.5px dashed #18181b;
+  border-radius: 8px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  page-break-inside: avoid;
+  break-inside: avoid;
+}
+.price-label-top {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #52525b;
+  border-bottom: 1px solid #e4e4e7;
+  padding-bottom: 4px;
+  margin-bottom: 8px;
+}
+.price-label-brand {
+  font-weight: 700;
+  color: #09090b;
+}
+.price-label-name {
+  font-size: 13.5px;
+  font-weight: 700;
+  line-height: 1.25;
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 6px;
+}
+.price-label-price {
+  font-size: 24px;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  background: #09090b;
+  color: #ffffff;
+  padding: 3px 12px;
+  border-radius: 6px;
+}
+.price-label-unit {
+  font-size: 10.5px;
+  color: #52525b;
+  margin-top: 3px;
+  margin-bottom: 8px;
+}
+.barcode-bars {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  height: 32px;
+  padding: 2px 6px;
+  background: #ffffff;
+}
+.barcode-bars span {
+  display: inline-block;
+  height: 100%;
+}
+.price-label-sku {
+  font-family: monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: #18181b;
+  margin-top: 3px;
 }
 
 @media print {

@@ -6,6 +6,7 @@ import { getCompanySettings } from "@/lib/audit";
 import { brl, fmtDate, num } from "@/lib/format";
 import { PageHeader, StatusBadge } from "@/components/ui";
 import { PrintButton } from "@/components/PrintButton";
+import { PixQrBox } from "@/components/PixQrBox";
 
 export default async function SaleReceiptPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -132,6 +133,18 @@ export default async function SaleReceiptPage({ params }: { params: Promise<{ id
           <div className="doc-section">
             <div className="small muted bold">OBSERVAÇÕES</div>
             <div className="small">{sale.notes}</div>
+          </div>
+        )}
+
+        {(company.pixKey || company.document) && (
+          <div className="doc-section">
+            <PixQrBox
+              pixKey={company.pixKey || company.document || ""}
+              merchantName={company.tradeName || company.name}
+              merchantCity={company.city}
+              amount={sale.total}
+              txid={`VENDA${sale.id}`}
+            />
           </div>
         )}
 
