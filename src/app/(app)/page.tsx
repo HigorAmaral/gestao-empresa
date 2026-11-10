@@ -60,7 +60,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: SP
     prisma.product.count({ where: { active: true } }),
     prisma.serviceOrder.count({ where: { status: { in: ["ABERTA", "EM_ANDAMENTO", "AGUARDANDO_PECA"] } } }),
     prisma.$queryRaw<{ id: number; sku: string; name: string; stock: number; minStock: number; unit: string }[]>`
-      SELECT id, sku, name, stock, minStock, unit FROM Product WHERE active = 1 AND stock <= minStock ORDER BY (stock - minStock) ASC LIMIT 6`,
+      SELECT id, sku, name, stock, "minStock", unit FROM "Product" WHERE active = true AND stock <= "minStock" ORDER BY (stock - "minStock") ASC LIMIT 6`,
     prisma.sale.findMany({
       orderBy: [{ date: "desc" }, { id: "desc" }],
       take: 6,

@@ -19,7 +19,7 @@ export default async function ProdutosPage({ searchParams }: { searchParams: SP 
 
   let lowIds: number[] | null = null;
   if (filter === "baixo") {
-    const rows = await prisma.$queryRaw<{ id: number }[]>`SELECT id FROM Product WHERE stock <= minStock AND active = 1`;
+    const rows = await prisma.$queryRaw<{ id: number }[]>`SELECT id FROM "Product" WHERE stock <= "minStock" AND active = true`;
     lowIds = rows.map((r) => Number(r.id));
   }
 

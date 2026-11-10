@@ -26,7 +26,7 @@ export default async function EstoquePage({ searchParams }: { searchParams: SP }
     prisma.stockMovement.findMany({ where, orderBy: { createdAt: "desc" }, skip, take, include: { product: true, user: true } }),
     prisma.stockMovement.count({ where }),
     prisma.$queryRaw<{ id: number; sku: string; name: string; stock: number; minStock: number; unit: string }[]>`
-      SELECT id, sku, name, stock, minStock, unit FROM Product WHERE active = 1 AND stock <= minStock ORDER BY (stock - minStock) ASC LIMIT 10`,
+      SELECT id, sku, name, stock, "minStock", unit FROM "Product" WHERE active = true AND stock <= "minStock" ORDER BY (stock - "minStock") ASC LIMIT 10`,
   ]);
 
   const costValue = products.reduce((s, p) => s + p.stock * p.costPrice, 0);
