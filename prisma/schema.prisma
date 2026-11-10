@@ -27,6 +27,8 @@ model User {
   movements     StockMovement[]
   serviceOrders ServiceOrder[]
   auditLogs     AuditLog[]
+  receipts      GoodsReceipt[]
+  productionOrders ProductionOrder[]
 }
 
 model CompanySettings {
@@ -94,6 +96,7 @@ model Supplier {
 
   products  Product[]
   purchases Purchase[]
+  receipts  GoodsReceipt[]
 }
 
 model Product {
@@ -114,9 +117,12 @@ model Product {
 
   saleItems         SaleItem[]
   purchaseItems     PurchaseItem[]
-  serviceOrderItems ServiceOrderItem[]
-  movements         StockMovement[]
-  stockLocations    ProductStockLocation[]
+  serviceOrderItems    ServiceOrderItem[]
+  movements            StockMovement[]
+  stockLocations       ProductStockLocation[]
+  receiptItems         GoodsReceiptItem[]
+  productionOrders     ProductionOrder[]     @relation("ProductProduction")
+  productionOrderItems ProductionOrderItem[] @relation("ProductRawMaterial")
 }
 
 model Employee {
@@ -188,6 +194,7 @@ model Purchase {
 
   items     PurchaseItem[]
   financial FinancialEntry[]
+  receipts  GoodsReceipt[]
 }
 
 model PurchaseItem {
@@ -285,7 +292,9 @@ model StockLocation {
   active      Boolean                @default(true)
   createdAt   DateTime               @default(now())
 
-  items       ProductStockLocation[]
+  items                ProductStockLocation[]
+  receiptItems         GoodsReceiptItem[]
+  productionOrderItems ProductionOrderItem[]
 }
 
 model ProductStockLocation {
@@ -301,3 +310,73 @@ model ProductStockLocation {
 
   @@unique([productId, locationId])
 }
+
+// ---------- Recebimento de Mercadorias & Matérias-Primas ----------
+
+model GoodsReceipt {
+  id            Int                @id @default(autoincrement())
+  code          String             @unique // ex: "REC-001"
+  invoiceNumber String?            // Número da Nota Fiscal (NF-e)
+  supplierId    Int?
+  supplier      Supplier?          @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  purchaseId    Int?
+  purchase      Purchase?          @relation(fields: [purchaseId], references: [id], onDelete: SetNull)
+  status        String             @default("RECEBIDO") // PENDENTE | RECEBIDO | CANCELADO
+  receivedAt    DateTime           @default(now())
+  notes         String?
+  userId        Int?
+  user          User?              @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt     DateTime           @default(now())
+
+  items         GoodsReceiptItem[]
+}
+
+model GoodsReceiptItem {
+  id         Int            @id @default(autoincrement())
+  receiptId  Int
+  receipt    GoodsReceipt   @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  productId  Int
+  product    Product        @relation(fields: [productId], references: [id])
+  quantity   Float          // Quantidade recebida
+  unitCost   Float          @default(0)
+  locationId Int?           // Endereço de estoque onde foi armazenado
+  location   StockLocation? @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  batch      String?        // Lote do fabricante
+  notes      String?
+}
+
+// ---------- Ordens de Produção (OP) ----------
+
+model ProductionOrder {
+  id           Int                   @id @default(autoincrement())
+  code         String                @unique // ex: "OP-001"
+  productId    Int                   // Produto Final a Fabricar
+  product      Product               @relation("ProductProduction", fields: [productId], references: [id])
+  quantity     Float                 // Quantidade planejada a produzir
+  machine      String                // Máquina / Posto de trabalho / Linha de entrega
+  operatorName String?               // Operador responsável pela máquina
+  priority     String                @default("NORMAL") // BAIXA | NORMAL | ALTA | URGENTE
+  status       String                @default("PLANEJADA") // PLANEJADA | EM_PRODUCAO | CONCLUIDA | CANCELADA
+  startDate    DateTime?             // Início da produção
+  deliveryDate DateTime?             // Previsão de entrega dos materiais na máquina
+  completedAt  DateTime?             // Conclusão da produção
+  notes        String?               // Instruções técnicas / operacionais
+  userId       Int?
+  user         User?                 @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt    DateTime              @default(now())
+
+  items        ProductionOrderItem[]
+}
+
+model ProductionOrderItem {
+  id                Int              @id @default(autoincrement())
+  productionOrderId Int
+  productionOrder   ProductionOrder  @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
+  productId         Int              // Insumo / Matéria-prima necessária
+  product           Product          @relation("ProductRawMaterial", fields: [productId], references: [id])
+  quantityRequired  Float            // Quantidade total necessária para a OP
+  locationId        Int?             // Endereço de estoque de onde retirar
+  location          StockLocation?   @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  notes             String?
+}
+

@@ -16,6 +16,10 @@ from .models import (
     StockMovement,
     StockLocation,
     ProductStockLocation,
+    GoodsReceipt,
+    GoodsReceiptItem,
+    ProductionOrder,
+    ProductionOrderItem,
     Supplier,
 )
 
@@ -149,4 +153,43 @@ class StockLocationSerializer(serializers.ModelSerializer):
     class Meta:
         model = StockLocation
         fields = "__all__"
+
+
+class GoodsReceiptItemSerializer(serializers.ModelSerializer):
+    product_name = serializers.CharField(source="product.name", read_only=True)
+    location_code = serializers.CharField(source="location.code", read_only=True)
+
+    class Meta:
+        model = GoodsReceiptItem
+        fields = "__all__"
+
+
+class GoodsReceiptSerializer(serializers.ModelSerializer):
+    items = GoodsReceiptItemSerializer(many=True, read_only=True)
+    supplier_name = serializers.CharField(source="supplier.name", read_only=True)
+    user_name = serializers.CharField(source="user.name", read_only=True)
+
+    class Meta:
+        model = GoodsReceipt
+        fields = "__all__"
+
+
+class ProductionOrderItemSerializer(serializers.ModelSerializer):
+    product_name = serializers.CharField(source="product.name", read_only=True)
+    location_code = serializers.CharField(source="location.code", read_only=True)
+
+    class Meta:
+        model = ProductionOrderItem
+        fields = "__all__"
+
+
+class ProductionOrderSerializer(serializers.ModelSerializer):
+    items = ProductionOrderItemSerializer(many=True, read_only=True)
+    product_name = serializers.CharField(source="product.name", read_only=True)
+    user_name = serializers.CharField(source="user.name", read_only=True)
+
+    class Meta:
+        model = ProductionOrder
+        fields = "__all__"
+
 

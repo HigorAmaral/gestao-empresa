@@ -1,4 +1,5 @@
 import { Sidebar } from "@/components/Sidebar";
+import { DynamicBrandTitle } from "@/components/DynamicBrandTitle";
 import { requireUser } from "@/lib/auth";
 import { getCompanySettings, getSidebarAlerts } from "@/lib/audit";
 
@@ -12,6 +13,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="app">
+      <DynamicBrandTitle brandName={brandName} />
       <Sidebar session={session} brandName={brandName} alerts={alerts} />
       <main className="main">{children}</main>
     </div>

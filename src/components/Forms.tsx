@@ -54,13 +54,19 @@ export function ActionForm({
 export function ConfirmButton({
   action,
   label,
+  children,
   confirmText,
   className = "btn sm secondary",
+  style,
+  title,
 }: {
   action: () => Promise<void>;
-  label: string;
+  label?: string;
+  children?: ReactNode;
   confirmText?: string;
   className?: string;
+  style?: React.CSSProperties;
+  title?: string;
 }) {
   return (
     <form
@@ -70,16 +76,30 @@ export function ConfirmButton({
         if (confirmText && !window.confirm(confirmText)) e.preventDefault();
       }}
     >
-      <PendingButton label={label} className={className} />
+      <PendingButton label={label} className={className} style={style} title={title}>
+        {children}
+      </PendingButton>
     </form>
   );
 }
 
-function PendingButton({ label, className }: { label: string; className: string }) {
+function PendingButton({
+  label,
+  children,
+  className,
+  style,
+  title,
+}: {
+  label?: string;
+  children?: ReactNode;
+  className: string;
+  style?: React.CSSProperties;
+  title?: string;
+}) {
   const { pending } = useFormStatus();
   return (
-    <button type="submit" className={className} disabled={pending}>
-      {pending ? "..." : label}
+    <button type="submit" className={className} style={style} title={title} disabled={pending}>
+      {pending ? "..." : (children ?? label)}
     </button>
   );
 }

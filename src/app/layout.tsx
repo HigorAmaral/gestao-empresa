@@ -1,20 +1,28 @@
 import type { Metadata, Viewport } from "next";
+import { getCompanySettings } from "@/lib/audit";
 import { PwaServiceWorker } from "@/components/PwaManager";
 import "./globals.css";
 
-export const metadata: Metadata = {
-  title: "GestãoPro — Sistema de Gerenciamento Empresarial",
-  description: "Clientes, fornecedores, estoque, vendas, compras, OS, financeiro e RH em um só lugar.",
-  manifest: "/manifest.webmanifest",
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: "black-translucent",
-    title: "GestãoPro",
-  },
-  formatDetection: {
-    telephone: false,
-  },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const company = await getCompanySettings().catch(() => null);
+  const brand = company?.tradeName?.trim() || company?.name?.trim() || "GestãoPro";
+  return {
+    title: {
+      default: `${brand} — Sistema de Gerenciamento Empresarial`,
+      template: `%s | ${brand}`,
+    },
+    description: "Clientes, fornecedores, estoque, vendas, compras, OS, financeiro e RH em um só lugar.",
+    manifest: "/manifest.webmanifest",
+    appleWebApp: {
+      capable: true,
+      statusBarStyle: "black-translucent",
+      title: brand,
+    },
+    formatDetection: {
+      telephone: false,
+    },
+  };
+}
 
 export const viewport: Viewport = {
   themeColor: "#09090b",

@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import {
   BarChart3,
   Building2,
+  Factory,
   History,
   LayoutDashboard,
   LogOut,
@@ -13,6 +14,7 @@ import {
   Menu,
   Moon,
   Package,
+  PackageCheck,
   Receipt,
   Settings,
   ShieldCheck,
@@ -41,6 +43,7 @@ type Item = {
   Icon: LucideIcon;
   moduleKey?: ModuleKey;
   alertKey?: keyof SidebarAlerts;
+  subItem?: boolean;
 };
 
 const SECTIONS: { title: string; items: Item[] }[] = [
@@ -50,6 +53,7 @@ const SECTIONS: { title: string; items: Item[] }[] = [
     items: [
       { href: "/vendas", label: "Vendas", Icon: ShoppingCart, moduleKey: "vendas" },
       { href: "/os", label: "Ordens de Serviço", Icon: Wrench, moduleKey: "os", alertKey: "os" },
+      { href: "/producao", label: "Produção (OP)", Icon: Factory, moduleKey: "os" },
       { href: "/clientes", label: "Clientes", Icon: Users, moduleKey: "clientes" },
     ],
   },
@@ -58,7 +62,8 @@ const SECTIONS: { title: string; items: Item[] }[] = [
     items: [
       { href: "/produtos", label: "Produtos", Icon: Package, moduleKey: "produtos" },
       { href: "/estoque", label: "Estoque", Icon: Warehouse, moduleKey: "estoque", alertKey: "estoque" },
-      { href: "/estoque/enderecamento", label: "Endereçamento", Icon: MapPin, moduleKey: "estoque" },
+      { href: "/estoque/enderecamento", label: "Endereçamento", Icon: MapPin, moduleKey: "estoque", subItem: true },
+      { href: "/recebimento", label: "Recebimento", Icon: PackageCheck, moduleKey: "estoque" },
       { href: "/compras", label: "Compras", Icon: Receipt, moduleKey: "compras" },
       { href: "/fornecedores", label: "Fornecedores", Icon: Truck, moduleKey: "fornecedores" },
     ],
@@ -121,7 +126,21 @@ export function Sidebar({
     }
   }
 
-  const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
+  const allHrefs = SECTIONS.flatMap((s) => s.items.map((i) => i.href));
+  const isActive = (href: string) => {
+    if (href === "/") return pathname === "/";
+    if (pathname === href) return true;
+    if (pathname.startsWith(href + "/")) {
+      const hasMoreSpecific = allHrefs.some(
+        (other) =>
+          other !== href &&
+          other.startsWith(href) &&
+          (pathname === other || pathname.startsWith(other + "/"))
+      );
+      return !hasMoreSpecific;
+    }
+    return false;
+  };
 
   return (
     <>
@@ -196,11 +215,16 @@ export function Sidebar({
             return (
               <div key={section.title}>
                 <div className="section">{section.title}</div>
-                {items.map(({ href, label, Icon, alertKey }) => {
+                {items.map(({ href, label, Icon, alertKey, subItem }) => {
                   const count = alertKey && alerts ? alerts[alertKey] : 0;
                   return (
-                    <Link key={href} href={href} className={isActive(href) ? "active" : ""}>
-                      <Icon size={17} strokeWidth={2} />
+                    <Link
+                      key={href}
+                      href={href}
+                      className={`${isActive(href) ? "active" : ""} ${subItem ? "sidebar-subitem" : ""}`}
+                      style={subItem ? { paddingLeft: 24, fontSize: 13, gap: 8 } : undefined}
+                    >
+                      <Icon size={subItem ? 14 : 17} strokeWidth={2} />
                       <span style={{ flex: 1 }}>{label}</span>
                       {count > 0 && <span className="sidebar-badge">{count}</span>}
                     </Link>

@@ -180,6 +180,45 @@ export async function GET(req: NextRequest) {
         e.active ? "Sim" : "Não",
       ]),
     );
+  } else if (entity === "recebimento") {
+    await ensureStockLocationTables();
+    const list = await prisma.goodsReceipt.findMany({
+      orderBy: { receivedAt: "desc" },
+      include: { supplier: true, items: { include: { product: true, location: true } } },
+    });
+    csv = buildCsv(
+      ["Código", "Data/Hora", "NF-e", "Fornecedor", "Status", "Itens", "Observações"],
+      list.map((r) => [
+        r.code,
+        fmtDateTime(r.receivedAt),
+        r.invoiceNumber ?? "",
+        r.supplier?.name ?? "Direto",
+        r.status,
+        r.items.map((i) => `${i.quantity}x ${i.product.name} [End: ${i.location?.code ?? "Sem endereço"}]`).join("; "),
+        r.notes ?? "",
+      ])
+    );
+  } else if (entity === "producao") {
+    await ensureStockLocationTables();
+    const list = await prisma.productionOrder.findMany({
+      orderBy: { createdAt: "desc" },
+      include: { product: true, items: { include: { product: true, location: true } } },
+    });
+    csv = buildCsv(
+      ["Código", "Produto a Fabricar", "Quantidade", "Máquina de Destino", "Operador", "Prioridade", "Status", "Previsão Entrega", "Insumos (BOM)", "Instruções"],
+      list.map((o) => [
+        o.code,
+        o.product.name,
+        o.quantity,
+        o.machine,
+        o.operatorName ?? "",
+        o.priority,
+        o.status,
+        o.deliveryDate ? fmtDate(o.deliveryDate) : "",
+        o.items.map((i) => `${i.quantityRequired}x ${i.product.name} [Retirar de: ${i.location?.code ?? "Sem endereço"}]`).join("; "),
+        o.notes ?? "",
+      ])
+    );
   } else if (entity === "auditoria") {
     const list = await prisma.auditLog.findMany({ orderBy: { createdAt: "desc" }, take: 1000 });
     csv = buildCsv(

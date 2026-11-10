@@ -550,3 +550,185 @@ class ProductStockLocation(models.Model):
     def __str__(self):
         return f"{self.product.name} ({self.quantity} un) @ {self.location.code}"
 
+
+class GoodsReceipt(models.Model):
+    STATUS_CHOICES = [
+        ("RECEBIDO", "Recebido"),
+        ("PENDENTE", "Pendente"),
+        ("CANCELADO", "Cancelado"),
+    ]
+
+    id = models.AutoField(primary_key=True)
+    code = models.CharField("Código", max_length=100, unique=True)
+    invoice_number = models.CharField("NF-e", max_length=100, blank=True, null=True, db_column="invoiceNumber")
+    supplier = models.ForeignKey(
+        Supplier,
+        verbose_name="Fornecedor",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        db_column="supplierId",
+        related_name="goods_receipts",
+    )
+    purchase = models.ForeignKey(
+        Purchase,
+        verbose_name="Compra Vinculada",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        db_column="purchaseId",
+        related_name="goods_receipts",
+    )
+    status = models.CharField("Status", max_length=50, choices=STATUS_CHOICES, default="RECEBIDO")
+    received_at = PrismaDateTimeField("Recebido em", default=timezone.now, db_column="receivedAt")
+    notes = models.TextField("Observações", blank=True, null=True)
+    user = models.ForeignKey(
+        AppUser,
+        verbose_name="Recebido por",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        db_column="userId",
+        related_name="goods_receipts",
+    )
+    created_at = PrismaDateTimeField("Criado em", default=timezone.now, db_column="createdAt")
+
+    class Meta:
+        db_table = "GoodsReceipt"
+        verbose_name = "Recebimento de Mercadoria"
+        verbose_name_plural = "Recebimentos de Mercadorias"
+        ordering = ["-received_at", "-id"]
+
+    def __str__(self):
+        return f"{self.code} — NF {self.invoice_number or 'S/N'}"
+
+
+class GoodsReceiptItem(models.Model):
+    id = models.AutoField(primary_key=True)
+    receipt = models.ForeignKey(
+        GoodsReceipt,
+        verbose_name="Recebimento",
+        on_delete=models.CASCADE,
+        db_column="receiptId",
+        related_name="items",
+    )
+    product = models.ForeignKey(
+        Product,
+        verbose_name="Produto / Insumo",
+        on_delete=models.PROTECT,
+        db_column="productId",
+        related_name="receipt_items",
+    )
+    quantity = models.FloatField("Quantidade Recebida")
+    unit_cost = models.FloatField("Custo Unitário", default=0, db_column="unitCost")
+    location = models.ForeignKey(
+        StockLocation,
+        verbose_name="Endereço no Estoque",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        db_column="locationId",
+        related_name="receipt_items",
+    )
+    batch = models.CharField("Lote", max_length=100, blank=True, null=True)
+    notes = models.TextField("Observações", blank=True, null=True)
+
+    class Meta:
+        db_table = "GoodsReceiptItem"
+        verbose_name = "Item Recebido"
+        verbose_name_plural = "Itens Recebidos"
+
+    def __str__(self):
+        return f"{self.quantity}x {self.product.name}"
+
+
+class ProductionOrder(models.Model):
+    PRIORITY_CHOICES = [
+        ("BAIXA", "Baixa"),
+        ("NORMAL", "Normal"),
+        ("ALTA", "Alta"),
+        ("URGENTE", "Urgente"),
+    ]
+    STATUS_CHOICES = [
+        ("PLANEJADA", "Planejada"),
+        ("EM_PRODUCAO", "Em Produção"),
+        ("CONCLUIDA", "Concluída"),
+        ("CANCELADA", "Cancelada"),
+    ]
+
+    id = models.AutoField(primary_key=True)
+    code = models.CharField("Código da OP", max_length=100, unique=True)
+    product = models.ForeignKey(
+        Product,
+        verbose_name="Produto a Fabricar",
+        on_delete=models.PROTECT,
+        db_column="productId",
+        related_name="production_orders",
+    )
+    quantity = models.FloatField("Quantidade Planejada")
+    machine = models.CharField("Máquina / Posto de Entrega", max_length=150)
+    operator_name = models.CharField("Operador Designado", max_length=150, blank=True, null=True, db_column="operatorName")
+    priority = models.CharField("Prioridade", max_length=50, choices=PRIORITY_CHOICES, default="NORMAL")
+    status = models.CharField("Status", max_length=50, choices=STATUS_CHOICES, default="PLANEJADA")
+    start_date = PrismaDateTimeField("Início da Produção", blank=True, null=True, db_column="startDate")
+    delivery_date = PrismaDateTimeField("Previsão de Entrega na Máquina", blank=True, null=True, db_column="deliveryDate")
+    completed_at = PrismaDateTimeField("Concluída em", blank=True, null=True, db_column="completedAt")
+    notes = models.TextField("Instruções Técnicas", blank=True, null=True)
+    user = models.ForeignKey(
+        AppUser,
+        verbose_name="Criada por",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        db_column="userId",
+        related_name="production_orders",
+    )
+    created_at = PrismaDateTimeField("Criada em", default=timezone.now, db_column="createdAt")
+
+    class Meta:
+        db_table = "ProductionOrder"
+        verbose_name = "Ordem de Produção (OP)"
+        verbose_name_plural = "Ordens de Produção (OPs)"
+        ordering = ["-id"]
+
+    def __str__(self):
+        return f"{self.code} — {self.product.name} ({self.machine})"
+
+
+class ProductionOrderItem(models.Model):
+    id = models.AutoField(primary_key=True)
+    production_order = models.ForeignKey(
+        ProductionOrder,
+        verbose_name="Ordem de Produção",
+        on_delete=models.CASCADE,
+        db_column="productionOrderId",
+        related_name="items",
+    )
+    product = models.ForeignKey(
+        Product,
+        verbose_name="Insumo / Matéria-Prima",
+        on_delete=models.PROTECT,
+        db_column="productId",
+        related_name="consumed_in_orders",
+    )
+    quantity_required = models.FloatField("Quantidade Necessária", db_column="quantityRequired")
+    location = models.ForeignKey(
+        StockLocation,
+        verbose_name="Endereço de Retirada",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        db_column="locationId",
+        related_name="production_order_items",
+    )
+    notes = models.TextField("Instruções do Insumo", blank=True, null=True)
+
+    class Meta:
+        db_table = "ProductionOrderItem"
+        verbose_name = "Insumo da OP"
+        verbose_name_plural = "Insumos da OP"
+
+    def __str__(self):
+        return f"{self.quantity_required}x {self.product.name} -> {self.production_order.code}"
+
+

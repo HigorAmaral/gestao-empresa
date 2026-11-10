@@ -105,11 +105,15 @@ h2 { font-size: 15px; font-weight: 600; display: flex; align-items: center; gap:
 .sidebar nav a {
   display: flex; align-items: center; gap: 10px;
   padding: 8px 10px; border-radius: 6px;
+  margin-bottom: 2px;
   color: var(--sidebar-text); font-weight: 500; font-size: 13.5px;
   transition: background .12s, color .12s;
 }
 .sidebar nav a:hover { background: #18181b; color: #fff; text-decoration: none; }
-.sidebar nav a.active { background: #ffffff; color: #09090b; font-weight: 600; }
+.sidebar nav a.active { background: #ffffff; color: #09090b; font-weight: 600; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15); }
+.sidebar nav a.sidebar-subitem {
+  position: relative;
+}
 .sidebar .userbox { border-top: 1px solid var(--sidebar-border); padding: 14px 16px; font-size: 13px; }
 .sidebar .userbox .name { color: #fff; font-weight: 600; }
 .sidebar .userbox .role { color: #71717a; font-size: 12px; }

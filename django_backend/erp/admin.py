@@ -18,6 +18,10 @@ from .models import (
     StockMovement,
     StockLocation,
     ProductStockLocation,
+    GoodsReceipt,
+    GoodsReceiptItem,
+    ProductionOrder,
+    ProductionOrderItem,
     Supplier,
 )
 
@@ -214,4 +218,31 @@ class ProductStockLocationAdmin(admin.ModelAdmin):
     list_display = ("id", "product", "location", "quantity", "notes", "updated_at")
     list_filter = ("location",)
     search_fields = ("product__name", "product__sku", "location__code", "notes")
+
+
+class GoodsReceiptItemInline(admin.TabularInline):
+    model = GoodsReceiptItem
+    extra = 1
+
+
+@admin.register(GoodsReceipt)
+class GoodsReceiptAdmin(admin.ModelAdmin):
+    list_display = ("code", "invoice_number", "supplier", "status", "received_at", "user")
+    list_filter = ("status", "received_at")
+    search_fields = ("code", "invoice_number", "supplier__name", "notes")
+    inlines = [GoodsReceiptItemInline]
+
+
+class ProductionOrderItemInline(admin.TabularInline):
+    model = ProductionOrderItem
+    extra = 1
+
+
+@admin.register(ProductionOrder)
+class ProductionOrderAdmin(admin.ModelAdmin):
+    list_display = ("code", "product", "quantity", "machine", "operator_name", "priority", "status", "delivery_date")
+    list_filter = ("status", "priority", "machine")
+    search_fields = ("code", "product__name", "machine", "operator_name", "notes")
+    inlines = [ProductionOrderItemInline]
+
 

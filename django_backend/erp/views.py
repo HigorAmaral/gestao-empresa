@@ -16,6 +16,8 @@ from .models import (
     StockMovement,
     StockLocation,
     ProductStockLocation,
+    GoodsReceipt,
+    ProductionOrder,
     Supplier,
 )
 from .serializers import (
@@ -32,6 +34,8 @@ from .serializers import (
     StockMovementSerializer,
     StockLocationSerializer,
     ProductStockLocationSerializer,
+    GoodsReceiptSerializer,
+    ProductionOrderSerializer,
     SupplierSerializer,
 )
 
@@ -140,4 +144,15 @@ class StockLocationViewSet(viewsets.ModelViewSet):
 class ProductStockLocationViewSet(viewsets.ModelViewSet):
     queryset = ProductStockLocation.objects.select_related("product", "location").all()
     serializer_class = ProductStockLocationSerializer
+
+
+class GoodsReceiptViewSet(viewsets.ModelViewSet):
+    queryset = GoodsReceipt.objects.select_related("supplier", "user", "purchase").prefetch_related("items__product", "items__location").all()
+    serializer_class = GoodsReceiptSerializer
+
+
+class ProductionOrderViewSet(viewsets.ModelViewSet):
+    queryset = ProductionOrder.objects.select_related("product", "user").prefetch_related("items__product", "items__location").all()
+    serializer_class = ProductionOrderSerializer
+
 
