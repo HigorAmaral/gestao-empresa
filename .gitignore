@@ -2,6 +2,7 @@ node_modules
 .next
 out
 *.db
+!prisma/seed.db
 *.db-journal
 .env
 next-env.d.ts
@@ -10,3 +11,4 @@ __pycache__/
 *.py[cod]
 .venv/
 venv/
+.vercel

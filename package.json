@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "prisma generate && next build",
     "start": "next start",
     "django": "python django_backend/manage.py runserver 8000",
     "django:migrate": "python django_backend/manage.py migrate --fake-initial",
