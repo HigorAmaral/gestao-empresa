@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Printer } from "lucide-react";
+import { MessageCircle, Printer } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { brl, fmtDate, fmtDateTime, PAYMENT_METHODS, toInputDate, todayInput } from "@/lib/format";
+import { buildWhatsAppUrl, saleWhatsAppMessage } from "@/lib/whatsapp";
 import { FlashMessages, PageHeader, StatusBadge } from "@/components/ui";
 import { ActionForm, ConfirmButton } from "@/components/Forms";
 import { ItemsEditor } from "@/components/ItemsEditor";
@@ -10,7 +11,13 @@ import { cancelSale, confirmSale, deleteSale, saveSale } from "../actions";
 
 type SP = Promise<Record<string, string | string[] | undefined>>;
 
-export default async function VendaPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: SP }) {
+export default async function VendaPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: SP;
+}) {
   const { id } = await params;
   const sp = await searchParams;
   const isNew = id === "novo";
@@ -23,29 +30,68 @@ export default async function VendaPage({ params, searchParams }: { params: Prom
   if (!isNew && !sale) notFound();
 
   const editable = isNew || sale!.status === "ORCAMENTO";
+  const defaultClientId = typeof sp.clientId === "string" ? Number(sp.clientId) : sale?.clientId ?? "";
 
   const [clients, products] = await Promise.all([
-    prisma.client.findMany({ where: { OR: [{ active: true }, { id: sale?.clientId ?? -1 }] }, orderBy: { name: "asc" } }),
+    prisma.client.findMany({
+      where: { OR: [{ active: true }, { id: sale?.clientId ?? -1 }] },
+      orderBy: { name: "asc" },
+    }),
     prisma.product.findMany({
       where: { OR: [{ active: true }, { id: { in: sale?.items.map((i) => i.productId) ?? [] } }] },
       orderBy: { name: "asc" },
     }),
   ]);
 
-  const editorProducts = products.map((p) => ({ id: p.id, sku: p.sku, name: p.name, unit: p.unit, price: p.salePrice, stock: p.stock }));
-  const initialItems = sale?.items.map((i) => ({ productId: i.productId, quantity: i.quantity, price: i.unitPrice })) ?? [];
+  const editorProducts = products.map((p) => ({
+    id: p.id,
+    sku: p.sku,
+    name: p.name,
+    unit: p.unit,
+    price: p.salePrice,
+    stock: p.stock,
+  }));
+  const initialItems =
+    sale?.items.map((i) => ({ productId: i.productId, quantity: i.quantity, price: i.unitPrice })) ?? [];
+
+  const waUrl = sale
+    ? buildWhatsAppUrl(
+        sale.client?.phone,
+        saleWhatsAppMessage({
+          id: sale.id,
+          status: sale.status,
+          date: sale.date,
+          total: sale.total,
+          paymentMethod: sale.paymentMethod,
+          installments: sale.installments,
+          clientName: sale.client?.name,
+          items: sale.items.map((i) => ({
+            name: i.product.name,
+            quantity: i.quantity,
+            total: i.total,
+          })),
+        }),
+      )
+    : null;
 
   return (
     <>
       <PageHeader
         title={isNew ? "Nova venda" : `Venda #${sale!.id}`}
         subtitle={
-          isNew ? "Monte o orçamento e confirme para efetivar a venda" : `Criada em ${fmtDateTime(sale!.createdAt)} por ${sale!.user?.name ?? "—"}`
+          isNew
+            ? "Monte o orçamento, escolha o parcelamento e confirme para efetivar a venda"
+            : `Criada em ${fmtDateTime(sale!.createdAt)} por ${sale!.user?.name ?? "—"}`
         }
         actions={
           sale && (
             <>
               <StatusBadge status={sale.status} />
+              {waUrl && (
+                <a className="btn secondary" href={waUrl} target="_blank" rel="noopener noreferrer">
+                  <MessageCircle size={15} /> WhatsApp
+                </a>
+              )}
               <Link className="btn secondary" href={`/vendas/${sale.id}/recibo`}>
                 <Printer size={15} /> Recibo / Pedido
               </Link>
@@ -54,7 +100,7 @@ export default async function VendaPage({ params, searchParams }: { params: Prom
                   action={confirmSale.bind(null, sale.id)}
                   label="Confirmar venda"
                   className="btn success"
-                  confirmText="Confirmar a venda? O estoque será baixado e uma conta a receber será criada."
+                  confirmText="Confirmar a venda? O estoque será baixado e as parcelas serão geradas no financeiro."
                 />
               )}
               {sale.status !== "CANCELADA" && (
@@ -91,9 +137,9 @@ export default async function VendaPage({ params, searchParams }: { params: Prom
             }
           >
             <div className="form-grid mb">
-              <div className="field">
+              <div className="field s4">
                 <label>Cliente</label>
-                <select name="clientId" defaultValue={sale?.clientId ?? ""}>
+                <select name="clientId" defaultValue={defaultClientId}>
                   <option value="">Consumidor final</option>
                   {clients.map((c) => (
                     <option key={c.id} value={c.id}>
@@ -112,6 +158,16 @@ export default async function VendaPage({ params, searchParams }: { params: Prom
                   <option value="">—</option>
                   {PAYMENT_METHODS.map((m) => (
                     <option key={m}>{m}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="field s2">
+                <label>Parcelas</label>
+                <select name="installments" defaultValue={sale?.installments ?? 1}>
+                  {Array.from({ length: 12 }, (_, i) => i + 1).map((n) => (
+                    <option key={n} value={n}>
+                      {n === 1 ? "1x (À vista)" : `${n}x mensais`}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -136,11 +192,20 @@ export default async function VendaPage({ params, searchParams }: { params: Prom
           <div className="card">
             <dl className="dl mb">
               <dt>Cliente</dt>
-              <dd>{sale!.client ? <Link href={`/clientes/${sale!.clientId}`}>{sale!.client.name}</Link> : "Consumidor final"}</dd>
+              <dd>
+                {sale!.client ? (
+                  <Link href={`/clientes/${sale!.clientId}`}>{sale!.client.name}</Link>
+                ) : (
+                  "Consumidor final"
+                )}
+              </dd>
               <dt>Data</dt>
               <dd>{fmtDate(sale!.date)}</dd>
               <dt>Forma de pagamento</dt>
-              <dd>{sale!.paymentMethod ?? "—"}</dd>
+              <dd>
+                {sale!.paymentMethod ?? "—"}{" "}
+                {sale!.installments > 1 && <span className="badge blue">{sale!.installments}x</span>}
+              </dd>
               {sale!.notes && (
                 <>
                   <dt>Observações</dt>
@@ -160,7 +225,7 @@ export default async function VendaPage({ params, searchParams }: { params: Prom
           {sale!.financial.length > 0 && (
             <div className="card flush">
               <div className="card-header">
-                <h2>Lançamentos financeiros</h2>
+                <h2>Lançamentos financeiros ({sale!.financial.length} parcela(s))</h2>
               </div>
               <table>
                 <thead>

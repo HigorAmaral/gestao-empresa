@@ -4,14 +4,16 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
-import { reqStr, str, toFormError, type FormState } from "@/lib/form";
+import { num, reqStr, str, toFormError, type FormState } from "@/lib/form";
 
 export async function saveCompanySettings(_prev: FormState, fd: FormData): Promise<FormState> {
-  const session = await requireAdmin();
+  const session = await requireAdmin("configuracoes");
   try {
+    const monthlyGoal = Math.max(0, num(fd, "monthlyGoal", 30000));
     const data = {
       name: reqStr(fd, "name", "Razão Social"),
       tradeName: str(fd, "tradeName"),
+      monthlyGoal,
       document: str(fd, "document"),
       stateRegistration: str(fd, "stateRegistration"),
       email: str(fd, "email"),

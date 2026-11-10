@@ -1,4 +1,5 @@
 import { unstable_cache } from "next/cache";
+import { todayUTC } from "./format";
 import { prisma } from "./prisma";
 import type { Session } from "./token";
 
@@ -33,4 +34,33 @@ export const getCompanySettings = unstable_cache(
   },
   ["company-settings"],
   { tags: ["company-settings"], revalidate: 3600 },
+);
+
+export type SidebarAlerts = {
+  os: number;
+  estoque: number;
+  financeiro: number;
+};
+
+export const getSidebarAlerts = unstable_cache(
+  async (): Promise<SidebarAlerts> => {
+    const today = todayUTC();
+    const [openOs, lowStockRows, overdueFin] = await Promise.all([
+      prisma.serviceOrder.count({
+        where: { status: { in: ["ABERTA", "EM_ANDAMENTO", "AGUARDANDO_PECA"] } },
+      }),
+      prisma.$queryRaw<{ c: bigint }[]>`
+        SELECT COUNT(*) AS c FROM "Product" WHERE active = true AND stock <= "minStock"`,
+      prisma.financialEntry.count({
+        where: { status: "PENDENTE", dueDate: { lt: today } },
+      }),
+    ]);
+    return {
+      os: openOs,
+      estoque: Number(lowStockRows[0]?.c ?? 0),
+      financeiro: overdueFin,
+    };
+  },
+  ["sidebar-alerts"],
+  { tags: ["sidebar-alerts"], revalidate: 30 },
 );

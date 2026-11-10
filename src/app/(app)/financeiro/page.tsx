@@ -1,10 +1,11 @@
 import Link from "next/link";
 import type { Prisma } from "@prisma/client";
-import { Plus } from "lucide-react";
+import { MessageCircle, Plus } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
 import { pageParams, spStr } from "@/lib/form";
 import { brl, fmtDate, todayUTC } from "@/lib/format";
+import { buildWhatsAppUrl, financialWhatsAppMessage } from "@/lib/whatsapp";
 import { ExportCsvButton, FlashMessages, PageHeader, Pagination, StatusBadge } from "@/components/ui";
 import { ConfirmButton } from "@/components/Forms";
 import { deleteEntry, markPaid } from "./actions";
@@ -38,7 +39,16 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: S
     prisma.financialEntry.aggregate({ where: { ...extra, ...(dueFilter && { dueDate: dueFilter }) }, _sum: { amount: true } });
 
   const [entries, total, recPaid, desPaid, recOpen, desOpen, overdue] = await Promise.all([
-    prisma.financialEntry.findMany({ where, orderBy: [{ dueDate: "asc" }, { id: "asc" }], skip, take }),
+    prisma.financialEntry.findMany({
+      where,
+      orderBy: [{ dueDate: "asc" }, { id: "asc" }],
+      skip,
+      take,
+      include: {
+        sale: { select: { client: { select: { name: true, phone: true } } } },
+        serviceOrder: { select: { client: { select: { name: true, phone: true } } } },
+      },
+    }),
     prisma.financialEntry.count({ where }),
     sumWhere({ type: "RECEITA", status: "PAGO" }),
     sumWhere({ type: "DESPESA", status: "PAGO" }),
@@ -175,6 +185,25 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: S
                       {brl(e.amount)}
                     </td>
                     <td className="actions">
+                      {e.status === "PENDENTE" && e.type === "RECEITA" && (
+                        <a
+                          className="btn sm secondary"
+                          href={buildWhatsAppUrl(
+                            e.sale?.client?.phone ?? e.serviceOrder?.client?.phone,
+                            financialWhatsAppMessage({
+                              description: e.description,
+                              amount: e.amount,
+                              dueDate: e.dueDate,
+                              clientName: e.sale?.client?.name ?? e.serviceOrder?.client?.name,
+                            }),
+                          )}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="Enviar lembrete de cobrança no WhatsApp"
+                        >
+                          <MessageCircle size={13} /> Cobrar
+                        </a>
+                      )}
                       {e.status === "PENDENTE" && (
                         <ConfirmButton
                           action={markPaid.bind(null, e.id, returnTo)}

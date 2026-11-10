@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
@@ -14,6 +14,7 @@ function back(id: number, key: "ok" | "erro", msg: string): never {
 }
 
 function revalidateAll() {
+  revalidateTag("sidebar-alerts", "max");
   for (const p of ["/vendas", "/produtos", "/estoque", "/financeiro", "/"]) revalidatePath(p);
 }
 
@@ -30,10 +31,13 @@ export async function saveSale(id: number | null, _prev: FormState, fd: FormData
     const products = await prisma.product.count({ where: { id: { in: items.map((i) => i.productId) } } });
     if (products !== items.length) throw new ValidationError("Um ou mais produtos não existem mais.");
 
+    const installments = Math.min(12, Math.max(1, Math.floor(num(fd, "installments", 1))));
+
     const data = {
       clientId: intOrNull(fd, "clientId"),
       date: dateVal(fd, "date") ?? new Date(),
       paymentMethod: str(fd, "paymentMethod"),
+      installments,
       notes: str(fd, "notes"),
       subtotal,
       discount,
@@ -67,7 +71,7 @@ export async function saveSale(id: number | null, _prev: FormState, fd: FormData
   back(saleId!, "ok", "Venda salva. Confirme para baixar o estoque e lançar no financeiro.");
 }
 
-/** Confirma a venda: baixa o estoque e gera a conta a receber. */
+/** Confirma a venda: baixa o estoque e gera a(s) conta(s) a receber (à vista ou parcelado). */
 export async function confirmSale(id: number) {
   const session = await requireUser();
   try {
@@ -86,23 +90,54 @@ export async function confirmSale(id: number) {
       for (const item of sale.items) {
         await tx.product.update({ where: { id: item.productId }, data: { stock: { decrement: item.quantity } } });
         await tx.stockMovement.create({
-          data: { productId: item.productId, type: "SAIDA", quantity: item.quantity, reason: `Venda #${sale.id}`, userId: session.userId },
+          data: {
+            productId: item.productId,
+            type: "SAIDA",
+            quantity: item.quantity,
+            reason: `Venda #${sale.id}`,
+            userId: session.userId,
+          },
         });
       }
 
-      const paidNow = !!sale.paymentMethod && INSTANT_PAYMENTS.includes(sale.paymentMethod);
-      await tx.financialEntry.create({
-        data: {
-          type: "RECEITA",
-          description: `Venda #${sale.id}`,
-          category: "Vendas",
-          amount: sale.total,
-          dueDate: sale.date,
-          status: paidNow ? "PAGO" : "PENDENTE",
-          paidAt: paidNow ? new Date() : null,
-          saleId: sale.id,
-        },
-      });
+      const installments = Math.min(12, Math.max(1, sale.installments || 1));
+      const paidNow = installments === 1 && !!sale.paymentMethod && INSTANT_PAYMENTS.includes(sale.paymentMethod);
+
+      if (installments === 1) {
+        await tx.financialEntry.create({
+          data: {
+            type: "RECEITA",
+            description: `Venda #${sale.id}`,
+            category: "Vendas",
+            amount: sale.total,
+            dueDate: sale.date,
+            status: paidNow ? "PAGO" : "PENDENTE",
+            paidAt: paidNow ? new Date() : null,
+            saleId: sale.id,
+          },
+        });
+      } else {
+        const baseSlice = round2(Math.floor((sale.total / installments) * 100) / 100);
+        const remainder = round2(sale.total - baseSlice * installments);
+
+        const rows = Array.from({ length: installments }, (_, i) => {
+          const d = new Date(sale.date);
+          d.setUTCMonth(d.getUTCMonth() + i);
+          const amount = i === 0 ? round2(baseSlice + remainder) : baseSlice;
+          return {
+            type: "RECEITA",
+            description: `Venda #${sale.id} (${i + 1}/${installments})`,
+            category: "Vendas",
+            amount,
+            dueDate: d,
+            status: "PENDENTE",
+            paidAt: null,
+            saleId: sale.id,
+          };
+        });
+        await tx.financialEntry.createMany({ data: rows });
+      }
+
       await tx.sale.update({ where: { id }, data: { status: "CONFIRMADA" } });
     });
     await logAudit(session, "VENDAS", "CONFIRMAR", `Confirmou venda #${id}`, id);
@@ -111,7 +146,7 @@ export async function confirmSale(id: number) {
     back(id, "erro", r?.error ?? "Erro ao confirmar.");
   }
   revalidateAll();
-  back(id, "ok", "Venda confirmada! Estoque baixado e lançamento financeiro gerado.");
+  back(id, "ok", "Venda confirmada! Estoque baixado e lançamento(s) financeiro(s) gerado(s).");
 }
 
 /** Cancela a venda: devolve o estoque (se confirmada) e cancela lançamentos pendentes. */

@@ -26,10 +26,18 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { logout } from "@/app/login/actions";
+import type { SidebarAlerts } from "@/lib/audit";
 import { hasModuleAccess, type ModuleKey } from "@/lib/permissions";
 import type { Session } from "@/lib/token";
+import { GlobalSearch } from "./GlobalSearch";
 
-type Item = { href: string; label: string; Icon: LucideIcon; moduleKey?: ModuleKey };
+type Item = {
+  href: string;
+  label: string;
+  Icon: LucideIcon;
+  moduleKey?: ModuleKey;
+  alertKey?: keyof SidebarAlerts;
+};
 
 const SECTIONS: { title: string; items: Item[] }[] = [
   { title: "Geral", items: [{ href: "/", label: "Dashboard", Icon: LayoutDashboard }] },
@@ -37,7 +45,7 @@ const SECTIONS: { title: string; items: Item[] }[] = [
     title: "Comercial & Serviços",
     items: [
       { href: "/vendas", label: "Vendas", Icon: ShoppingCart, moduleKey: "vendas" },
-      { href: "/os", label: "Ordens de Serviço", Icon: Wrench, moduleKey: "os" },
+      { href: "/os", label: "Ordens de Serviço", Icon: Wrench, moduleKey: "os", alertKey: "os" },
       { href: "/clientes", label: "Clientes", Icon: Users, moduleKey: "clientes" },
     ],
   },
@@ -45,7 +53,7 @@ const SECTIONS: { title: string; items: Item[] }[] = [
     title: "Suprimentos",
     items: [
       { href: "/produtos", label: "Produtos", Icon: Package, moduleKey: "produtos" },
-      { href: "/estoque", label: "Estoque", Icon: Warehouse, moduleKey: "estoque" },
+      { href: "/estoque", label: "Estoque", Icon: Warehouse, moduleKey: "estoque", alertKey: "estoque" },
       { href: "/compras", label: "Compras", Icon: Receipt, moduleKey: "compras" },
       { href: "/fornecedores", label: "Fornecedores", Icon: Truck, moduleKey: "fornecedores" },
     ],
@@ -53,7 +61,13 @@ const SECTIONS: { title: string; items: Item[] }[] = [
   {
     title: "Gestão & Sistema",
     items: [
-      { href: "/financeiro", label: "Financeiro", Icon: Wallet, moduleKey: "financeiro" },
+      {
+        href: "/financeiro",
+        label: "Financeiro",
+        Icon: Wallet,
+        moduleKey: "financeiro",
+        alertKey: "financeiro",
+      },
       { href: "/funcionarios", label: "Funcionários", Icon: UserCheck, moduleKey: "funcionarios" },
       { href: "/relatorios", label: "Relatórios", Icon: BarChart3, moduleKey: "relatorios" },
       { href: "/usuarios", label: "Usuários", Icon: ShieldCheck, moduleKey: "usuarios" },
@@ -63,7 +77,15 @@ const SECTIONS: { title: string; items: Item[] }[] = [
   },
 ];
 
-export function Sidebar({ session, brandName = "GestãoPro" }: { session: Session; brandName?: string }) {
+export function Sidebar({
+  session,
+  brandName = "GestãoPro",
+  alerts,
+}: {
+  session: Session;
+  brandName?: string;
+  alerts?: SidebarAlerts;
+}) {
   const pathname = usePathname();
   const isAdmin = session.role === "ADMIN";
   const [dark, setDark] = useState(false);
@@ -108,6 +130,12 @@ export function Sidebar({ session, brandName = "GestãoPro" }: { session: Sessio
           {dark ? <Sun size={15} /> : <Moon size={15} />}
         </button>
       </div>
+
+      {/* Busca Global Instantânea (Ctrl + K) */}
+      <div style={{ padding: "10px 12px 2px" }}>
+        <GlobalSearch />
+      </div>
+
       <nav>
         {SECTIONS.map((section) => {
           const items = section.items.filter((i) => !i.moduleKey || hasModuleAccess(session, i.moduleKey));
@@ -115,12 +143,16 @@ export function Sidebar({ session, brandName = "GestãoPro" }: { session: Sessio
           return (
             <div key={section.title}>
               <div className="section">{section.title}</div>
-              {items.map(({ href, label, Icon }) => (
-                <Link key={href} href={href} className={isActive(href) ? "active" : ""}>
-                  <Icon size={17} strokeWidth={2} />
-                  {label}
-                </Link>
-              ))}
+              {items.map(({ href, label, Icon, alertKey }) => {
+                const count = alertKey && alerts ? alerts[alertKey] : 0;
+                return (
+                  <Link key={href} href={href} className={isActive(href) ? "active" : ""}>
+                    <Icon size={17} strokeWidth={2} />
+                    <span style={{ flex: 1 }}>{label}</span>
+                    {count > 0 && <span className="sidebar-badge">{count}</span>}
+                  </Link>
+                );
+              })}
             </div>
           );
         })}

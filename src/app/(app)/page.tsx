@@ -17,7 +17,9 @@ import {
 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
+import { getCompanySettings } from "@/lib/audit";
 import { brl, fmtDate, fmtDateTime, monthKey, monthLabel, num, todayUTC } from "@/lib/format";
+import { buildWhatsAppUrl, financialWhatsAppMessage } from "@/lib/whatsapp";
 import { BarChart, FlashMessages, HBarList, PageHeader, StatusBadge } from "@/components/ui";
 import { markPaid } from "./financeiro/actions";
 
@@ -131,8 +133,7 @@ const PRIORITY_WEIGHT: Record<string, number> = {
 };
 
 export default async function DashboardPage({ searchParams }: { searchParams: SP }) {
-  const session = await requireUser();
-  const sp = await searchParams;
+  const [session, company, sp] = await Promise.all([requireUser(), getCompanySettings(), searchParams]);
   const isAdmin = session.role === "ADMIN";
   const today = todayUTC();
   const rawPeriodo = typeof sp.periodo === "string" ? sp.periodo : undefined;
@@ -334,8 +335,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: SP
   const currDes = desPeriod._sum.amount ?? 0;
   const netPeriod = currRec - currDes;
 
-  // Meta do período (base mensal de R$ 30.000 ou 20% acima do período anterior)
-  const baseGoal = Math.max(30000 * period.goalMultiplier, prevSalesTotal * 1.2);
+  // Meta do período baseada na Meta Mensal configurada em /configuracoes
+  const configuredMonthlyGoal = company.monthlyGoal && company.monthlyGoal > 0 ? company.monthlyGoal : 30000;
+  const baseGoal = configuredMonthlyGoal * period.goalMultiplier;
   const goalPct = baseGoal > 0 ? Math.min(100, (currSalesTotal / baseGoal) * 100) : 0;
   const goalRemaining = Math.max(0, baseGoal - currSalesTotal);
 
@@ -409,8 +411,15 @@ export default async function DashboardPage({ searchParams }: { searchParams: SP
             <span className="bold">Meta de Faturamento ({period.label})</span>
             <span className="badge blue">{num(goalPct, 1)}% atingida</span>
           </div>
-          <div className="small">
-            <span className="bold">{brl(currSalesTotal)}</span> <span className="muted">de {brl(baseGoal)}</span>
+          <div className="small row" style={{ gap: 10 }}>
+            <span>
+              <span className="bold">{brl(currSalesTotal)}</span> <span className="muted">de {brl(baseGoal)}</span>
+            </span>
+            {isAdmin && (
+              <Link href="/configuracoes" className="muted" title="Alterar meta mensal">
+                ajustar meta
+              </Link>
+            )}
           </div>
         </div>
         <div className="goal-track">

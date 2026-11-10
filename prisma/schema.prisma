@@ -42,6 +42,7 @@ model CompanySettings {
   city              String?  @default("São Paulo")
   state             String?  @default("SP")
   zipCode           String?  @default("01310-100")
+  monthlyGoal       Float    @default(30000)
   receiptFooter     String?  @default("Obrigado pela preferência! Guarde este comprovante para garantia.")
   updatedAt         DateTime @updatedAt
 }
@@ -147,6 +148,7 @@ model Sale {
   date          DateTime @default(now())
   status        String   @default("ORCAMENTO") // ORCAMENTO | CONFIRMADA | CANCELADA
   paymentMethod String?
+  installments  Int      @default(1)
   subtotal      Float    @default(0)
   discount      Float    @default(0)
   total         Float    @default(0)

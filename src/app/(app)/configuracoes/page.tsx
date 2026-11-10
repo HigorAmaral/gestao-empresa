@@ -6,26 +6,36 @@ import { ActionForm } from "@/components/Forms";
 import { saveCompanySettings } from "./actions";
 
 export default async function ConfiguracoesPage() {
-  await requireAdmin();
+  await requireAdmin("configuracoes");
   const company = await getCompanySettings();
 
   return (
     <>
       <PageHeader
         title="Configurações da Empresa"
-        subtitle="Estes dados aparecem no cabeçalho e rodapé dos recibos de venda, orçamentos e ordens de serviço"
+        subtitle="Estes dados aparecem no cabeçalho dos recibos, tela de login, barra lateral e metas do Dashboard"
       />
 
       <div className="card">
         <ActionForm action={saveCompanySettings} submitLabel="Salvar configurações">
           <div className="form-grid">
-            <div className="field s8">
+            <div className="field s6">
               <label>Razão Social *</label>
               <input name="name" defaultValue={company.name} required />
             </div>
-            <div className="field s4">
+            <div className="field s3">
               <label>Nome Fantasia</label>
               <input name="tradeName" defaultValue={company.tradeName ?? ""} />
+            </div>
+            <div className="field s3">
+              <label>Meta Mensal de Faturamento (R$)</label>
+              <input
+                name="monthlyGoal"
+                type="number"
+                step="100"
+                min="0"
+                defaultValue={company.monthlyGoal ?? 30000}
+              />
             </div>
             <div className="field s4">
               <label>CNPJ</label>

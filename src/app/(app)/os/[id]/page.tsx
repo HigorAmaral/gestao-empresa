@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { CheckCircle2, Printer } from "lucide-react";
+import { CheckCircle2, MessageCircle, Printer } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { brl, fmtDate, fmtDateTime, PAYMENT_METHODS, toInputDate, todayInput } from "@/lib/format";
+import { buildWhatsAppUrl, osWhatsAppMessage } from "@/lib/whatsapp";
 import { FlashMessages, PageHeader, StatusBadge } from "@/components/ui";
 import { ActionForm, ConfirmButton } from "@/components/Forms";
 import { ItemsEditor } from "@/components/ItemsEditor";
@@ -48,6 +49,21 @@ export default async function ServiceOrderDetailPage({
     stock: p.stock,
   }));
   const initialItems = os?.items.map((i) => ({ productId: i.productId, quantity: i.quantity, price: i.unitPrice })) ?? [];
+  const defaultClientId = typeof sp.clientId === "string" ? Number(sp.clientId) : os?.clientId ?? "";
+
+  const waUrl = os
+    ? buildWhatsAppUrl(
+        os.client?.phone,
+        osWhatsAppMessage({
+          id: os.id,
+          equipment: os.equipment,
+          status: os.status,
+          total: os.total,
+          diagnosis: os.diagnosis,
+          clientName: os.client?.name,
+        }),
+      )
+    : null;
 
   return (
     <>
@@ -63,6 +79,11 @@ export default async function ServiceOrderDetailPage({
             <>
               <StatusBadge status={os.priority} />
               <StatusBadge status={os.status} />
+              {waUrl && (
+                <a className="btn secondary" href={waUrl} target="_blank" rel="noopener noreferrer">
+                  <MessageCircle size={15} /> WhatsApp
+                </a>
+              )}
               <Link className="btn secondary" href={`/os/${os.id}/recibo`}>
                 <Printer size={15} /> Imprimir OS
               </Link>
@@ -110,7 +131,7 @@ export default async function ServiceOrderDetailPage({
             <div className="form-grid mb">
               <div className="field s4">
                 <label>Cliente</label>
-                <select name="clientId" defaultValue={os?.clientId ?? ""}>
+                <select name="clientId" defaultValue={defaultClientId}>
                   <option value="">Cliente avulso</option>
                   {clients.map((c) => (
                     <option key={c.id} value={c.id}>
