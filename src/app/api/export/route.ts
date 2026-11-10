@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { fmtDate, fmtDateTime, STATUS_LABEL } from "@/lib/format";
+import { ensureStockLocationTables } from "@/lib/stock-location";
 
 function csvCell(val: unknown): string {
   if (val === null || val === undefined) return "";
@@ -85,10 +86,13 @@ export async function GET(req: NextRequest) {
       ]),
     );
   } else if (entity === "enderecamento") {
-    const list = await prisma.productStockLocation.findMany({
-      orderBy: [{ location: { code: "asc" } }, { product: { name: "asc" } }],
-      include: { product: true, location: true },
-    });
+    await ensureStockLocationTables();
+    const list = await prisma.productStockLocation
+      .findMany({
+        orderBy: [{ location: { code: "asc" } }, { product: { name: "asc" } }],
+        include: { product: true, location: true },
+      })
+      .catch(() => []);
     csv = buildCsv(
       ["Endereço", "Corredor/Rua", "Estante", "Nível", "Vão/Gaveta", "SKU", "Produto", "Qtd no Endereço", "Unidade", "Saldo Total", "Observações"],
       list.map((item) => [

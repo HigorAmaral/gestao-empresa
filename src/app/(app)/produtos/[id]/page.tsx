@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowRight, MapPin } from "lucide-react";
 import { prisma } from "@/lib/prisma";
+import { ensureStockLocationTables } from "@/lib/stock-location";
 import { fmtDateTime, num } from "@/lib/format";
 import { PageHeader, StatusBadge } from "@/components/ui";
 import { ActionForm } from "@/components/Forms";
@@ -12,6 +13,7 @@ const UNITS = ["UN", "CX", "KG", "G", "L", "ML", "M", "M2", "PC", "PCT", "HR", "
 export default async function ProdutoFormPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const isNew = id === "novo";
+  await ensureStockLocationTables();
   const product = isNew ? null : await prisma.product.findUnique({ where: { id: Number(id) } });
   if (!isNew && !product) notFound();
 
@@ -22,11 +24,13 @@ export default async function ProdutoFormPage({ params }: { params: Promise<{ id
       ? prisma.stockMovement.findMany({ where: { productId: product.id }, orderBy: { createdAt: "desc" }, take: 15, include: { user: true } })
       : Promise.resolve([]),
     product
-      ? prisma.productStockLocation.findMany({
-          where: { productId: product.id },
-          include: { location: true },
-          orderBy: { location: { code: "asc" } },
-        })
+      ? prisma.productStockLocation
+          .findMany({
+            where: { productId: product.id },
+            include: { location: true },
+            orderBy: { location: { code: "asc" } },
+          })
+          .catch(() => [])
       : Promise.resolve([]),
   ]);
 

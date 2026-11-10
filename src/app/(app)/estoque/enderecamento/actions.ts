@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
+import { ensureStockLocationTables } from "@/lib/stock-location";
 import {
   bool,
   intOrNull,
@@ -22,6 +23,7 @@ export async function saveLocation(
   fd: FormData
 ): Promise<FormState> {
   const session = await requireUser();
+  await ensureStockLocationTables();
   try {
     const code = reqStr(fd, "code", "Código do Endereço").toUpperCase().trim();
     const aisle = str(fd, "aisle");
@@ -75,6 +77,7 @@ export async function assignProductLocation(
   fd: FormData
 ): Promise<FormState> {
   const session = await requireUser();
+  await ensureStockLocationTables();
   try {
     const productId = intOrNull(fd, "productId");
     const locationId = intOrNull(fd, "locationId");
@@ -145,6 +148,7 @@ export async function transferProductLocation(
   fd: FormData
 ): Promise<FormState> {
   const session = await requireUser();
+  await ensureStockLocationTables();
   try {
     const productId = intOrNull(fd, "productId");
     const fromLocationId = intOrNull(fd, "fromLocationId");
@@ -225,6 +229,7 @@ export async function batchCreateLocations(
   fd: FormData
 ): Promise<FormState> {
   const session = await requireUser();
+  await ensureStockLocationTables();
   try {
     const aislePrefix = reqStr(fd, "aislePrefix", "Letra/Nome do Corredor (ex: A)").toUpperCase().trim();
     const racksCount = Number(fd.get("racksCount")) || 1;

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowLeft, MapPin } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { getCompanySettings } from "@/lib/audit";
+import { ensureStockLocationTables } from "@/lib/stock-location";
 import { PageHeader } from "@/components/ui";
 import { PrintButton } from "@/components/PrintButton";
 
@@ -24,16 +25,20 @@ export default async function LocationLabelsPage({
   const sp = await searchParams;
   const singleId = typeof sp.id === "string" && /^\d+$/.test(sp.id) ? Number(sp.id) : null;
 
+  await ensureStockLocationTables();
+
   const [locations, company] = await Promise.all([
-    prisma.stockLocation.findMany({
-      where: singleId ? { id: singleId } : { active: true },
-      orderBy: { code: "asc" },
-      include: {
-        items: {
-          include: { product: true },
+    prisma.stockLocation
+      .findMany({
+        where: singleId ? { id: singleId } : { active: true },
+        orderBy: { code: "asc" },
+        include: {
+          items: {
+            include: { product: true },
+          },
         },
-      },
-    }),
+      })
+      .catch(() => []),
     getCompanySettings(),
   ]);
 

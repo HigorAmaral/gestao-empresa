@@ -21,6 +21,7 @@ import { pageParams, spStr } from "@/lib/form";
 import { num } from "@/lib/format";
 import { ExportCsvButton, FlashMessages, PageHeader, Pagination } from "@/components/ui";
 import { ActionForm, ConfirmButton } from "@/components/Forms";
+import { ensureStockLocationTables } from "@/lib/stock-location";
 import {
   assignProductLocation,
   batchCreateLocations,
@@ -32,6 +33,22 @@ import {
 
 type SP = Promise<Record<string, string | string[] | undefined>>;
 
+type ProductWithLocations = Prisma.ProductGetPayload<{
+  include: {
+    stockLocations: {
+      include: { location: true };
+    };
+  };
+}>;
+
+type LocationWithItems = Prisma.StockLocationGetPayload<{
+  include: {
+    items: {
+      include: { product: true };
+    };
+  };
+}>;
+
 export default async function EnderecamentoPage({ searchParams }: { searchParams: SP }) {
   const sp = await searchParams;
   const view = spStr(sp, "view") || "produtos"; // "produtos" | "enderecos"
@@ -42,27 +59,43 @@ export default async function EnderecamentoPage({ searchParams }: { searchParams
   const op = spStr(sp, "op"); // "novo_endereco" | "lote" | "transferir" | null
   const { page, skip, take, pageSize } = pageParams(sp);
 
+  // Garante que as tabelas de endereçamento existam no banco
+  await ensureStockLocationTables();
+
   // Busca lista de produtos ativos e endereços ativos para os formulários
-  const [allProducts, allLocations] = await Promise.all([
-    prisma.product.findMany({
-      where: { active: true },
-      orderBy: { name: "asc" },
-      include: {
-        stockLocations: {
-          include: { location: true },
+  let allProducts: ProductWithLocations[] = [];
+  let allLocations: LocationWithItems[] = [];
+  let dbError: string | null = null;
+
+  try {
+    const [prods, locs] = await Promise.all([
+      prisma.product.findMany({
+        where: { active: true },
+        orderBy: { name: "asc" },
+        include: {
+          stockLocations: {
+            include: { location: true },
+          },
         },
-      },
-    }),
-    prisma.stockLocation.findMany({
-      where: { active: true },
-      orderBy: { code: "asc" },
-      include: {
-        items: {
-          include: { product: true },
+      }),
+      prisma.stockLocation.findMany({
+        where: { active: true },
+        orderBy: { code: "asc" },
+        include: {
+          items: {
+            include: { product: true },
+          },
         },
-      },
-    }),
-  ]);
+      }),
+    ]);
+    allProducts = prods;
+    allLocations = locs;
+  } catch (err: unknown) {
+    console.error("Falha ao carregar dados de endereçamento:", err);
+    dbError = "Sincronizando tabelas de endereçamento no banco de dados. Se persistir, recarregue a página.";
+    allProducts = [];
+    allLocations = [];
+  }
 
   // KPIs
   const totalLocations = allLocations.length;
@@ -80,84 +113,92 @@ export default async function EnderecamentoPage({ searchParams }: { searchParams
   });
 
   // Query específica da aba ativa
-  let productsList: typeof allProducts = [];
+  let productsList: ProductWithLocations[] = [];
   let productsTotal = 0;
-  let locationsList: typeof allLocations = [];
+  let locationsList: LocationWithItems[] = [];
   let locationsTotal = 0;
 
-  if (view === "produtos") {
-    const prodWhere: Prisma.ProductWhereInput = {
-      active: true,
-      ...(q && {
-        OR: [
-          { name: { contains: q, mode: "insensitive" } },
-          { sku: { contains: q, mode: "insensitive" } },
-          { category: { contains: q, mode: "insensitive" } },
-        ],
-      }),
-      ...(selectedProductId && { id: selectedProductId }),
-    };
+  try {
+    if (view === "produtos") {
+      const prodWhere: Prisma.ProductWhereInput = {
+        active: true,
+        ...(q && {
+          OR: [
+            { name: { contains: q } },
+            { sku: { contains: q } },
+            { category: { contains: q } },
+          ],
+        }),
+        ...(selectedProductId && { id: selectedProductId }),
+      };
 
-    const fetched = await prisma.product.findMany({
-      where: prodWhere,
-      orderBy: { name: "asc" },
-      include: {
-        stockLocations: {
-          include: { location: true },
-          orderBy: { location: { code: "asc" } },
+      const fetched = await prisma.product.findMany({
+        where: prodWhere,
+        orderBy: { name: "asc" },
+        include: {
+          stockLocations: {
+            include: { location: true },
+            orderBy: { location: { code: "asc" } },
+          },
         },
-      },
-    });
-
-    let filtered = fetched;
-    if (filter === "pendentes") {
-      filtered = fetched.filter((p) => {
-        const allocated = p.stockLocations.reduce((s, l) => s + l.quantity, 0);
-        return p.stock > allocated;
       });
-    } else if (filter === "enderecados") {
-      filtered = fetched.filter((p) => p.stockLocations.length > 0);
-    } else if (filter === "sem_estoque") {
-      filtered = fetched.filter((p) => p.stock <= 0);
-    }
 
-    productsTotal = filtered.length;
-    productsList = filtered.slice(skip, skip + take);
-  } else {
-    // view === "enderecos"
-    const locWhere: Prisma.StockLocationWhereInput = {
-      active: true,
-      ...(q && {
-        OR: [
-          { code: { contains: q, mode: "insensitive" } },
-          { aisle: { contains: q, mode: "insensitive" } },
-          { rack: { contains: q, mode: "insensitive" } },
-          { description: { contains: q, mode: "insensitive" } },
-        ],
-      }),
-      ...(selectedLocationId && { id: selectedLocationId }),
-    };
+      let filtered = fetched;
+      if (filter === "pendentes") {
+        filtered = fetched.filter((p) => {
+          const allocated = p.stockLocations.reduce((s, l) => s + l.quantity, 0);
+          return p.stock > allocated;
+        });
+      } else if (filter === "enderecados") {
+        filtered = fetched.filter((p) => p.stockLocations.length > 0);
+      } else if (filter === "sem_estoque") {
+        filtered = fetched.filter((p) => p.stock <= 0);
+      }
 
-    const fetched = await prisma.stockLocation.findMany({
-      where: locWhere,
-      orderBy: { code: "asc" },
-      include: {
-        items: {
-          include: { product: true },
-          orderBy: { product: { name: "asc" } },
+      productsTotal = filtered.length;
+      productsList = filtered.slice(skip, skip + take);
+    } else {
+      // view === "enderecos"
+      const locWhere: Prisma.StockLocationWhereInput = {
+        active: true,
+        ...(q && {
+          OR: [
+            { code: { contains: q } },
+            { aisle: { contains: q } },
+            { rack: { contains: q } },
+            { description: { contains: q } },
+          ],
+        }),
+        ...(selectedLocationId && { id: selectedLocationId }),
+      };
+
+      const fetched = await prisma.stockLocation.findMany({
+        where: locWhere,
+        orderBy: { code: "asc" },
+        include: {
+          items: {
+            include: { product: true },
+            orderBy: { product: { name: "asc" } },
+          },
         },
-      },
-    });
+      });
 
-    let filtered = fetched;
-    if (filter === "ocupados") {
-      filtered = fetched.filter((l) => l.items.length > 0);
-    } else if (filter === "livres") {
-      filtered = fetched.filter((l) => l.items.length === 0);
+      let filtered = fetched;
+      if (filter === "ocupados") {
+        filtered = fetched.filter((l) => l.items.length > 0);
+      } else if (filter === "livres") {
+        filtered = fetched.filter((l) => l.items.length === 0);
+      }
+
+      locationsTotal = filtered.length;
+      locationsList = filtered.slice(skip, skip + take);
     }
-
-    locationsTotal = filtered.length;
-    locationsList = filtered.slice(skip, skip + take);
+  } catch (err) {
+    console.error("Erro na busca de dados de endereçamento:", err);
+    productsList = allProducts.slice(skip, skip + take);
+    productsTotal = allProducts.length;
+    locationsList = allLocations.slice(skip, skip + take);
+    locationsTotal = allLocations.length;
   }
 
   return (
@@ -178,6 +219,11 @@ export default async function EnderecamentoPage({ searchParams }: { searchParams
         }
       />
       <FlashMessages sp={sp} />
+      {dbError && (
+        <div className="alert error" style={{ marginBottom: 16 }}>
+          <AlertCircle size={17} /> {dbError}
+        </div>
+      )}
 
       {/* Subnavegação entre Estoque Geral e Endereçamento */}
       <div className="subnav-tabs">
