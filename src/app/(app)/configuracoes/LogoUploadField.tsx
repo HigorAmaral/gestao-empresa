@@ -29,10 +29,10 @@ export function LogoUploadField({ initialLogoUrl }: { initialLogoUrl?: string | 
         return;
       }
 
-      // Otimiza e redimensiona a imagem via Canvas para manter o banco leve
+      // Otimiza e redimensiona a imagem via Canvas para manter o banco leve e com alta resolução
       const img = new Image();
       img.onload = () => {
-        const maxDim = 500;
+        const maxDim = 800;
         let w = img.width;
         let h = img.height;
 
@@ -92,17 +92,17 @@ export function LogoUploadField({ initialLogoUrl }: { initialLogoUrl?: string | 
         {/* Caixa de Visualização da Logo */}
         <div
           style={{
-            width: 90,
-            height: 90,
-            borderRadius: 8,
+            width: 115,
+            height: 115,
+            borderRadius: 10,
             border: "1px solid var(--border)",
             background: "#ffffff",
             display: "grid",
             placeItems: "center",
             overflow: "hidden",
-            boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+            boxShadow: "0 1px 4px rgba(0,0,0,0.08)",
             flexShrink: 0,
-            padding: 4,
+            padding: 6,
           }}
         >
           {logoUrl ? (

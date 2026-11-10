@@ -43,7 +43,7 @@ export default async function SaleReceiptPage({ params }: { params: Promise<{ id
               <img
                 src={company.logoUrl}
                 alt={company.tradeName || company.name}
-                style={{ maxHeight: 60, maxWidth: 140, objectFit: "contain", borderRadius: 4 }}
+                style={{ maxHeight: 85, maxWidth: 220, objectFit: "contain", borderRadius: 6, flexShrink: 0 }}
               />
             )}
             <div>

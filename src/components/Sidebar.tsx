@@ -154,9 +154,9 @@ export function Sidebar({
               src={logoUrl}
               alt={brandName}
               style={{
-                width: 30,
-                height: 30,
-                borderRadius: 7,
+                width: 36,
+                height: 36,
+                borderRadius: 8,
                 background: "#ffffff",
                 objectFit: "contain",
                 padding: 2,
@@ -164,8 +164,8 @@ export function Sidebar({
               }}
             />
           ) : (
-            <div className="logo">
-              <Building2 size={17} strokeWidth={2.2} />
+            <div className="logo" style={{ width: 36, height: 36 }}>
+              <Building2 size={18} strokeWidth={2.2} />
             </div>
           )}
           <span>{brandName}</span>
@@ -201,21 +201,21 @@ export function Sidebar({
                 src={logoUrl}
                 alt={brandName}
                 style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: 7,
+                  width: 42,
+                  height: 42,
+                  borderRadius: 8,
                   background: "#ffffff",
                   objectFit: "contain",
-                  padding: 2,
+                  padding: 3,
                   flexShrink: 0,
                 }}
               />
             ) : (
-              <div className="logo">
-                <Building2 size={18} strokeWidth={2.2} />
+              <div className="logo" style={{ width: 40, height: 40 }}>
+                <Building2 size={20} strokeWidth={2.2} />
               </div>
             )}
-            <span>{brandName}</span>
+            <span style={{ fontSize: 16.5 }}>{brandName}</span>
           </div>
           <div className="row" style={{ gap: 6 }}>
             <button

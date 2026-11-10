@@ -132,22 +132,23 @@ export function LoginForm({
                 src={logoUrl}
                 alt={brandName}
                 style={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: 10,
+                  width: 58,
+                  height: 58,
+                  borderRadius: 12,
                   background: "#ffffff",
                   objectFit: "contain",
-                  padding: 3,
+                  padding: 4,
                   border: "1px solid #e4e4e7",
+                  flexShrink: 0,
                 }}
               />
             ) : (
-              <div className="logo">
-                <Building2 size={23} />
+              <div className="logo" style={{ width: 56, height: 56 }}>
+                <Building2 size={26} />
               </div>
             )}
             <div>
-              <h1 style={{ fontSize: 23, color: "#09090b" }}>{brandName}</h1>
+              <h1 style={{ fontSize: 24, color: "#09090b" }}>{brandName}</h1>
               <div style={{ fontSize: 12.5, color: "#71717a" }}>Acesse sua conta corporativa</div>
             </div>
           </div>
