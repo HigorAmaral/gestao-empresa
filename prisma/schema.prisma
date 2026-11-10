@@ -36,6 +36,9 @@ model CompanySettings {
   name              String   @default("GestãoPro Empresarial Ltda")
   tradeName         String?  @default("GestãoPro")
   logoUrl           String?  // URL da Logo ou imagem em base64 (data:image/...)
+  primaryColor      String?  @default("#09090b") // Cor primária / botões principais
+  sidebarColor      String?  @default("#09090b") // Cor da barra lateral / menu
+  accentColor       String?  @default("#2563eb") // Cor de destaque / realce
   document          String?  @default("00.000.000/0001-00")
   stateRegistration String?
   email             String?  @default("contato@empresa.com.br")

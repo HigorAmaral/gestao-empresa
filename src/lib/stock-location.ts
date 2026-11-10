@@ -151,6 +151,9 @@ export async function ensureStockLocationTables(): Promise<void> {
     await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "GoodsReceipt_code_idx" ON "GoodsReceipt"("code");`);
     await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "ProductionOrder_code_idx" ON "ProductionOrder"("code");`);
     await prisma.$executeRawUnsafe(`ALTER TABLE "CompanySettings" ADD COLUMN IF NOT EXISTS "logoUrl" TEXT;`).catch(() => {});
+    await prisma.$executeRawUnsafe(`ALTER TABLE "CompanySettings" ADD COLUMN IF NOT EXISTS "primaryColor" VARCHAR(50);`).catch(() => {});
+    await prisma.$executeRawUnsafe(`ALTER TABLE "CompanySettings" ADD COLUMN IF NOT EXISTS "sidebarColor" VARCHAR(50);`).catch(() => {});
+    await prisma.$executeRawUnsafe(`ALTER TABLE "CompanySettings" ADD COLUMN IF NOT EXISTS "accentColor" VARCHAR(50);`).catch(() => {});
 
     // Popula máquinas padrão caso vazio
     const machineCount = await prisma.productionMachine.count().catch(() => 0);
@@ -267,6 +270,15 @@ export async function ensureStockLocationTables(): Promise<void> {
       `);
       try {
         await prisma.$executeRawUnsafe(`ALTER TABLE "CompanySettings" ADD COLUMN "logoUrl" TEXT;`);
+      } catch {}
+      try {
+        await prisma.$executeRawUnsafe(`ALTER TABLE "CompanySettings" ADD COLUMN "primaryColor" TEXT;`);
+      } catch {}
+      try {
+        await prisma.$executeRawUnsafe(`ALTER TABLE "CompanySettings" ADD COLUMN "sidebarColor" TEXT;`);
+      } catch {}
+      try {
+        await prisma.$executeRawUnsafe(`ALTER TABLE "CompanySettings" ADD COLUMN "accentColor" TEXT;`);
       } catch {}
       await prisma.$executeRawUnsafe(`
         CREATE TABLE IF NOT EXISTS "ProductRecipeItem" (

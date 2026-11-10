@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { getCompanySettings } from "@/lib/audit";
 import { PwaServiceWorker } from "@/components/PwaManager";
+import { DynamicThemeStyles } from "@/components/DynamicThemeStyles";
 import "./globals.css";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -30,9 +31,18 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const company = await getCompanySettings().catch(() => null);
+
   return (
     <html lang="pt-BR">
+      <head>
+        <DynamicThemeStyles
+          primaryColor={company?.primaryColor}
+          sidebarColor={company?.sidebarColor}
+          accentColor={company?.accentColor}
+        />
+      </head>
       <body>
         <PwaServiceWorker />
         {children}
