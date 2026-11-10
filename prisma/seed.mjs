@@ -12,6 +12,8 @@ function daysAgo(days) {
 async function main() {
   await prisma.auditLog.deleteMany();
   await prisma.financialEntry.deleteMany();
+  await prisma.productStockLocation.deleteMany();
+  await prisma.stockLocation.deleteMany();
   await prisma.stockMovement.deleteMany();
   await prisma.serviceOrderItem.deleteMany();
   await prisma.serviceOrder.deleteMany();
@@ -196,6 +198,95 @@ async function main() {
         minStock: 3,
         supplierId: supTech.id,
       },
+    }),
+  ]);
+
+  // Endereços de Estoque
+  const locations = await Promise.all([
+    prisma.stockLocation.create({
+      data: {
+        code: "A-01-01",
+        aisle: "Corredor A",
+        rack: "Estante 01",
+        shelf: "Nível 01",
+        bin: "Vão 01",
+        description: "Informática & Equipamentos Principais",
+      },
+    }),
+    prisma.stockLocation.create({
+      data: {
+        code: "A-01-02",
+        aisle: "Corredor A",
+        rack: "Estante 01",
+        shelf: "Nível 02",
+        bin: "Vão 01",
+        description: "Monitores e Telas",
+      },
+    }),
+    prisma.stockLocation.create({
+      data: {
+        code: "B-02-01",
+        aisle: "Corredor B",
+        rack: "Estante 02",
+        shelf: "Nível 01",
+        bin: "Gaveta 01",
+        description: "Periféricos e Cabos",
+      },
+    }),
+    prisma.stockLocation.create({
+      data: {
+        code: "B-02-02",
+        aisle: "Corredor B",
+        rack: "Estante 02",
+        shelf: "Nível 02",
+        bin: "Gaveta 02",
+        description: "Headsets e Acessórios",
+      },
+    }),
+    prisma.stockLocation.create({
+      data: {
+        code: "C-01-01",
+        aisle: "Corredor C",
+        rack: "Estante 01",
+        shelf: "Térreo",
+        bin: "Palete 01",
+        description: "Móveis e Cadeiras Ergonômicas",
+      },
+    }),
+    prisma.stockLocation.create({
+      data: {
+        code: "D-03-01",
+        aisle: "Corredor D",
+        rack: "Estante 03",
+        shelf: "Nível 01",
+        bin: "Prateleira 01",
+        description: "Papelaria e Suprimentos de Escritório",
+      },
+    }),
+  ]);
+
+  // Endereçamento inicial dos produtos (localização física e quantidade naquele endereço)
+  await Promise.all([
+    prisma.productStockLocation.create({
+      data: { productId: products[0].id, locationId: locations[0].id, quantity: 12, notes: "Caixas lacradas originais" },
+    }),
+    prisma.productStockLocation.create({
+      data: { productId: products[1].id, locationId: locations[1].id, quantity: 18, notes: "Empilhamento máx 5 unidades" },
+    }),
+    prisma.productStockLocation.create({
+      data: { productId: products[2].id, locationId: locations[2].id, quantity: 3, notes: "Gôndola frontal de picking" },
+    }),
+    prisma.productStockLocation.create({
+      data: { productId: products[3].id, locationId: locations[3].id, quantity: 15, notes: "Gaveta B-02" },
+    }),
+    prisma.productStockLocation.create({
+      data: { productId: products[4].id, locationId: locations[4].id, quantity: 7, notes: "Palete térreo" },
+    }),
+    prisma.productStockLocation.create({
+      data: { productId: products[5].id, locationId: locations[5].id, quantity: 25, notes: "Caixas com 10 resmas cada" },
+    }),
+    prisma.productStockLocation.create({
+      data: { productId: products[6].id, locationId: locations[0].id, quantity: 8, notes: "Armário de peças / segurança" },
     }),
   ]);
 

@@ -84,6 +84,27 @@ export async function GET(req: NextRequest) {
         STATUS_LABEL[s.status] ?? s.status,
       ]),
     );
+  } else if (entity === "enderecamento") {
+    const list = await prisma.productStockLocation.findMany({
+      orderBy: [{ location: { code: "asc" } }, { product: { name: "asc" } }],
+      include: { product: true, location: true },
+    });
+    csv = buildCsv(
+      ["Endereço", "Corredor/Rua", "Estante", "Nível", "Vão/Gaveta", "SKU", "Produto", "Qtd no Endereço", "Unidade", "Saldo Total", "Observações"],
+      list.map((item) => [
+        item.location.code,
+        item.location.aisle ?? "",
+        item.location.rack ?? "",
+        item.location.shelf ?? "",
+        item.location.bin ?? "",
+        item.product.sku,
+        item.product.name,
+        String(item.quantity).replace(".", ","),
+        item.product.unit,
+        String(item.product.stock).replace(".", ","),
+        item.notes ?? "",
+      ]),
+    );
   } else if (entity === "compras") {
     const list = await prisma.purchase.findMany({
       orderBy: [{ date: "desc" }, { id: "desc" }],

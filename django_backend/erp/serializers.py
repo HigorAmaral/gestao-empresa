@@ -14,6 +14,8 @@ from .models import (
     ServiceOrder,
     ServiceOrderItem,
     StockMovement,
+    StockLocation,
+    ProductStockLocation,
     Supplier,
 )
 
@@ -129,3 +131,22 @@ class AuditLogSerializer(serializers.ModelSerializer):
     class Meta:
         model = AuditLog
         fields = "__all__"
+
+
+class ProductStockLocationSerializer(serializers.ModelSerializer):
+    product_name = serializers.CharField(source="product.name", read_only=True)
+    product_sku = serializers.CharField(source="product.sku", read_only=True)
+    location_code = serializers.CharField(source="location.code", read_only=True)
+
+    class Meta:
+        model = ProductStockLocation
+        fields = "__all__"
+
+
+class StockLocationSerializer(serializers.ModelSerializer):
+    items = ProductStockLocationSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = StockLocation
+        fields = "__all__"
+

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Prisma } from "@prisma/client";
-import { AlertTriangle, CheckCircle2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Layers, MapPin } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { pageParams, spStr } from "@/lib/form";
 import { brl, fmtDateTime, num } from "@/lib/format";
@@ -35,7 +35,24 @@ export default async function EstoquePage({ searchParams }: { searchParams: SP }
 
   return (
     <>
-      <PageHeader title="Estoque" subtitle="Saldos, movimentações e inventário" />
+      <PageHeader
+        title="Estoque"
+        subtitle="Saldos, movimentações e inventário"
+        actions={
+          <Link className="btn secondary" href="/estoque/enderecamento">
+            <MapPin size={15} /> Endereçamento de Estoque
+          </Link>
+        }
+      />
+
+      <div className="subnav-tabs">
+        <Link className="subnav-tab active" href="/estoque">
+          <Layers size={14} /> Movimentações & Saldo
+        </Link>
+        <Link className="subnav-tab" href="/estoque/enderecamento">
+          <MapPin size={14} /> Endereçamento & Localização
+        </Link>
+      </div>
 
       <div className="stats">
         <div className="stat">

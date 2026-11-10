@@ -14,6 +14,8 @@ from .models import (
     Sale,
     ServiceOrder,
     StockMovement,
+    StockLocation,
+    ProductStockLocation,
     Supplier,
 )
 from .serializers import (
@@ -28,6 +30,8 @@ from .serializers import (
     SaleSerializer,
     ServiceOrderSerializer,
     StockMovementSerializer,
+    StockLocationSerializer,
+    ProductStockLocationSerializer,
     SupplierSerializer,
 )
 
@@ -126,3 +130,14 @@ class FinancialEntryViewSet(viewsets.ModelViewSet):
 class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = AuditLog.objects.all()
     serializer_class = AuditLogSerializer
+
+
+class StockLocationViewSet(viewsets.ModelViewSet):
+    queryset = StockLocation.objects.prefetch_related("items__product").all()
+    serializer_class = StockLocationSerializer
+
+
+class ProductStockLocationViewSet(viewsets.ModelViewSet):
+    queryset = ProductStockLocation.objects.select_related("product", "location").all()
+    serializer_class = ProductStockLocationSerializer
+

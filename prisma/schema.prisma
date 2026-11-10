@@ -116,6 +116,7 @@ model Product {
   purchaseItems     PurchaseItem[]
   serviceOrderItems ServiceOrderItem[]
   movements         StockMovement[]
+  stockLocations    ProductStockLocation[]
 }
 
 model Employee {
@@ -269,4 +270,34 @@ model FinancialEntry {
   serviceOrderId Int?
   serviceOrder   ServiceOrder? @relation(fields: [serviceOrderId], references: [id], onDelete: SetNull)
   createdAt      DateTime      @default(now())
+}
+
+// ---------- Endereçamento de Estoque / Localização de Produtos ----------
+
+model StockLocation {
+  id          Int                    @id @default(autoincrement())
+  code        String                 @unique // Código do endereço (ex.: "A-01-02-01" ou "RUA-A-01")
+  aisle       String?                // Corredor / Rua / Galpão (ex: "Rua A", "Galpão 1")
+  rack        String?                // Prateleira / Estante / Módulo (ex: "Estante 01")
+  shelf       String?                // Nível / Andar (ex: "Nível 02")
+  bin         String?                // Vão / Gaveta / Posição (ex: "Gaveta 01")
+  description String?                // Descrição adicional / observações (ex: "Área de picking")
+  active      Boolean                @default(true)
+  createdAt   DateTime               @default(now())
+
+  items       ProductStockLocation[]
+}
+
+model ProductStockLocation {
+  id         Int           @id @default(autoincrement())
+  productId  Int
+  product    Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  locationId Int
+  location   StockLocation @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  quantity   Float         @default(0) // Quantidade do produto guardada neste endereço específico
+  notes      String?       // Observações (ex.: Lote, Caixa, Validade)
+  updatedAt  DateTime      @updatedAt
+  createdAt  DateTime      @default(now())
+
+  @@unique([productId, locationId])
 }

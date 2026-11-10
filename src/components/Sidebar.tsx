@@ -9,6 +9,7 @@ import {
   History,
   LayoutDashboard,
   LogOut,
+  MapPin,
   Menu,
   Moon,
   Package,
@@ -57,6 +58,7 @@ const SECTIONS: { title: string; items: Item[] }[] = [
     items: [
       { href: "/produtos", label: "Produtos", Icon: Package, moduleKey: "produtos" },
       { href: "/estoque", label: "Estoque", Icon: Warehouse, moduleKey: "estoque", alertKey: "estoque" },
+      { href: "/estoque/enderecamento", label: "Endereçamento", Icon: MapPin, moduleKey: "estoque" },
       { href: "/compras", label: "Compras", Icon: Receipt, moduleKey: "compras" },
       { href: "/fornecedores", label: "Fornecedores", Icon: Truck, moduleKey: "fornecedores" },
     ],

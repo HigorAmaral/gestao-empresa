@@ -496,3 +496,57 @@ class FinancialEntry(models.Model):
 
     def __str__(self):
         return f"[{self.type}] {self.description} — R$ {self.amount:.2f}"
+
+
+class StockLocation(models.Model):
+    id = models.AutoField(primary_key=True)
+    code = models.CharField("Código do Endereço", max_length=100, unique=True)
+    aisle = models.CharField("Corredor / Rua / Galpão", max_length=100, blank=True, null=True)
+    rack = models.CharField("Prateleira / Estante / Módulo", max_length=100, blank=True, null=True)
+    shelf = models.CharField("Nível / Andar", max_length=100, blank=True, null=True)
+    bin = models.CharField("Vão / Gaveta / Posição", max_length=100, blank=True, null=True)
+    description = models.TextField("Descrição / Observações", blank=True, null=True)
+    active = models.BooleanField("Ativo", default=True)
+    created_at = PrismaDateTimeField("Criado em", default=timezone.now, db_column="createdAt")
+
+    class Meta:
+        db_table = "StockLocation"
+        verbose_name = "Endereço de Estoque"
+        verbose_name_plural = "Endereços de Estoque"
+        ordering = ["code"]
+
+    def __str__(self):
+        return self.code
+
+
+class ProductStockLocation(models.Model):
+    id = models.AutoField(primary_key=True)
+    product = models.ForeignKey(
+        Product,
+        verbose_name="Produto",
+        on_delete=models.CASCADE,
+        db_column="productId",
+        related_name="stock_locations",
+    )
+    location = models.ForeignKey(
+        StockLocation,
+        verbose_name="Endereço de Estoque",
+        on_delete=models.CASCADE,
+        db_column="locationId",
+        related_name="items",
+    )
+    quantity = models.FloatField("Quantidade no Endereço", default=0)
+    notes = models.TextField("Observações", blank=True, null=True)
+    updated_at = PrismaDateTimeField("Atualizado em", default=timezone.now, db_column="updatedAt")
+    created_at = PrismaDateTimeField("Criado em", default=timezone.now, db_column="createdAt")
+
+    class Meta:
+        db_table = "ProductStockLocation"
+        verbose_name = "Item Endereçado"
+        verbose_name_plural = "Itens Endereçados"
+        unique_together = [("product", "location")]
+        ordering = ["location__code", "product__name"]
+
+    def __str__(self):
+        return f"{self.product.name} ({self.quantity} un) @ {self.location.code}"
+

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ArrowRight, MapPin } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { fmtDateTime, num } from "@/lib/format";
 import { PageHeader, StatusBadge } from "@/components/ui";
@@ -14,11 +15,18 @@ export default async function ProdutoFormPage({ params }: { params: Promise<{ id
   const product = isNew ? null : await prisma.product.findUnique({ where: { id: Number(id) } });
   if (!isNew && !product) notFound();
 
-  const [suppliers, categories, movements] = await Promise.all([
+  const [suppliers, categories, movements, stockLocations] = await Promise.all([
     prisma.supplier.findMany({ where: { OR: [{ active: true }, { id: product?.supplierId ?? -1 }] }, orderBy: { name: "asc" } }),
     prisma.product.findMany({ where: { category: { not: null } }, distinct: ["category"], select: { category: true } }),
     product
       ? prisma.stockMovement.findMany({ where: { productId: product.id }, orderBy: { createdAt: "desc" }, take: 15, include: { user: true } })
+      : Promise.resolve([]),
+    product
+      ? prisma.productStockLocation.findMany({
+          where: { productId: product.id },
+          include: { location: true },
+          orderBy: { location: { code: "asc" } },
+        })
       : Promise.resolve([]),
   ]);
 
@@ -108,6 +116,88 @@ export default async function ProdutoFormPage({ params }: { params: Promise<{ id
           </div>
         </ActionForm>
       </div>
+
+      {product && (
+        <div className="card flush mb" style={{ marginBottom: 20 }}>
+          <div
+            className="card-header"
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: 8,
+            }}
+          >
+            <h2>
+              <MapPin size={16} /> Endereçamento no Estoque
+            </h2>
+            <Link
+              className="btn sm secondary"
+              href={`/estoque/enderecamento?productId=${product.id}&view=produtos`}
+            >
+              Gerenciar Endereços <ArrowRight size={13} />
+            </Link>
+          </div>
+
+          <div style={{ padding: "12px 20px", borderBottom: "1px solid var(--border)", display: "flex", gap: 24, flexWrap: "wrap", fontSize: 13 }}>
+            <div>
+              <span className="muted">Saldo Físico Total:</span>{" "}
+              <strong>{num(product.stock)} {product.unit}</strong>
+            </div>
+            <div>
+              <span className="muted">Total Endereçado:</span>{" "}
+              <strong>
+                {num(stockLocations.reduce((s, it) => s + it.quantity, 0))} {product.unit}
+              </strong>
+            </div>
+            <div>
+              <span className="muted">Pendente de Alocação:</span>{" "}
+              <strong className={product.stock > stockLocations.reduce((s, it) => s + it.quantity, 0) ? "text-danger" : ""}>
+                {num(Math.max(0, product.stock - stockLocations.reduce((s, it) => s + it.quantity, 0)))} {product.unit}
+              </strong>
+            </div>
+          </div>
+
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Código do Endereço</th>
+                  <th>Localização (Corredor / Estante / Nível / Vão)</th>
+                  <th className="num">Quantidade Armazenada</th>
+                  <th>Observação</th>
+                </tr>
+              </thead>
+              <tbody>
+                {stockLocations.map((item) => (
+                  <tr key={item.id}>
+                    <td>
+                      <span className="location-tag highlight">{item.location.code}</span>
+                    </td>
+                    <td>
+                      {[item.location.aisle, item.location.rack, item.location.shelf, item.location.bin]
+                        .filter(Boolean)
+                        .join(" • ") || "—"}
+                    </td>
+                    <td className="num bold">
+                      {num(item.quantity)} {product.unit}
+                    </td>
+                    <td className="muted small">{item.notes ?? "—"}</td>
+                  </tr>
+                ))}
+                {stockLocations.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="empty">
+                      Este produto ainda não possui nenhum endereço de estoque registrado.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {product && (
         <div className="card flush">

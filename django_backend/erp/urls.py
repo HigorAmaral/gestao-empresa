@@ -12,6 +12,8 @@ from .views import (
     SaleViewSet,
     ServiceOrderViewSet,
     StockMovementViewSet,
+    StockLocationViewSet,
+    ProductStockLocationViewSet,
     SupplierViewSet,
     dashboard_summary,
 )
@@ -27,6 +29,8 @@ router.register(r"vendas", SaleViewSet, basename="vendas")
 router.register(r"compras", PurchaseViewSet, basename="compras")
 router.register(r"os", ServiceOrderViewSet, basename="os")
 router.register(r"estoque", StockMovementViewSet, basename="estoque")
+router.register(r"enderecos", StockLocationViewSet, basename="enderecos")
+router.register(r"enderecamento-itens", ProductStockLocationViewSet, basename="enderecamento-itens")
 router.register(r"financeiro", FinancialEntryViewSet, basename="financeiro")
 router.register(r"auditoria", AuditLogViewSet, basename="auditoria")
 

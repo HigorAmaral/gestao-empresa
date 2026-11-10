@@ -38,6 +38,7 @@ O **GestãoPro** integra todas as áreas essenciais de uma pequena ou média emp
 | **Clientes** | `/clientes` | Cadastro completo (CPF/CNPJ, contato, endereço, observações), histórico de vendas e exclusão/inativação segura. |
 | **Produtos** | `/produtos` | Catálogo com SKU único, categoria, unidade, preço de custo, preço de venda, cálculo automático de margem de lucro e estoque mínimo. |
 | **Estoque** | `/estoque` | Valorização do estoque (a preço de custo e de venda), lista de produtos abaixo do mínimo e movimentações manuais (`Entrada`, `Saída` e `Ajuste de Inventário`). |
+| **Endereçamento de Estoque** | `/estoque/enderecamento` | Localização física de produtos (ruas/corredores, estantes, níveis e gavetas), mapa de ocupação do armazém, saldo por endereço, transferências entre posições, gerador em lote de códigos e impressão de etiquetas. |
 | **Compras** | `/compras` | Pedidos de compra a fornecedores com geração automática de conta a pagar e recebimento de mercadoria (soma ao estoque e atualiza o custo unitário). |
 | **Fornecedores** | `/fornecedores` | Cadastro de fornecedores com listagem de produtos e compras vinculadas. |
 | **Financeiro** *(Admin)* | `/financeiro` | Contas a pagar e a receber, geração de parcelas recorrentes mensais, destaque de títulos vencidos e baixa rápida com 1 clique. |

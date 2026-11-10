@@ -16,6 +16,8 @@ from .models import (
     ServiceOrder,
     ServiceOrderItem,
     StockMovement,
+    StockLocation,
+    ProductStockLocation,
     Supplier,
 )
 
@@ -192,3 +194,24 @@ class AuditLogAdmin(admin.ModelAdmin):
     list_filter = ("module", "action")
     search_fields = ("user_name", "details", "entity_id")
     readonly_fields = ("created_at",)
+
+
+class ProductStockLocationInline(admin.TabularInline):
+    model = ProductStockLocation
+    extra = 1
+
+
+@admin.register(StockLocation)
+class StockLocationAdmin(admin.ModelAdmin):
+    list_display = ("code", "aisle", "rack", "shelf", "bin", "description", "active", "created_at")
+    list_filter = ("active", "aisle")
+    search_fields = ("code", "aisle", "rack", "description")
+    inlines = [ProductStockLocationInline]
+
+
+@admin.register(ProductStockLocation)
+class ProductStockLocationAdmin(admin.ModelAdmin):
+    list_display = ("id", "product", "location", "quantity", "notes", "updated_at")
+    list_filter = ("location",)
+    search_fields = ("product__name", "product__sku", "location__code", "notes")
+
