@@ -82,7 +82,8 @@ const SECTIONS: { title: string; items: Item[] }[] = [
   {
     title: "RH & Depto. Pessoal",
     items: [
-      { href: "/funcionarios", label: "Colaboradores & Folha", Icon: UserCheck, moduleKey: "funcionarios" },
+      { href: "/funcionarios", label: "Equipe & Prontuários", Icon: UserCheck, moduleKey: "funcionarios" },
+      { href: "/funcionarios/folha", label: "Folha de Pagamento", Icon: Receipt, moduleKey: "funcionarios" },
       { href: "/funcionarios/ponto", label: "Relógio de Ponto (REP)", Icon: Cpu, moduleKey: "funcionarios" },
       { href: "/funcionarios/ferias", label: "Férias & Atestados", Icon: Calendar, moduleKey: "funcionarios" },
       { href: "/funcionarios/sst", label: "EPIs & Exames (SST)", Icon: HeartPulse, moduleKey: "funcionarios" },

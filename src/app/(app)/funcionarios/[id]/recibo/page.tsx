@@ -52,8 +52,8 @@ export default async function EmployeePayslipPage({
                 Ver Mês
               </button>
             </form>
-            <Link className="btn secondary" href={`/funcionarios?tab=folha&month=${refMonth}`}>
-              <ArrowLeft size={15} /> Voltar ao RH
+            <Link className="btn secondary" href={`/funcionarios/folha?month=${refMonth}`}>
+              <ArrowLeft size={15} /> Voltar à Folha
             </Link>
             <PrintButton label="Imprimir Holerite / Salvar PDF" />
           </>

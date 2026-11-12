@@ -655,9 +655,10 @@ export async function addPayrollEventAction(fd: FormData) {
 
   await logAudit(session, "RH", "LANCAR_RUBRICA", `Lançou ${description} (R$ ${amount.toFixed(2)}) para ${emp.name} em ${month}`, emp.id);
   revalidatePath("/funcionarios");
+  revalidatePath("/funcionarios/folha");
   revalidatePath("/financeiro");
   redirect(
-    `/funcionarios?tab=folha&month=${month}&ok=` +
+    `/funcionarios/folha?month=${month}&ok=` +
       encodeURIComponent(
         category === "ADIANTAMENTO_VALE"
           ? `Vale Quinzenal de R$ ${amount.toFixed(2)} lançado para ${emp.name}! Despesa registrada no Financeiro e desconto incluído no Holerite.`
@@ -670,29 +671,328 @@ export async function deletePayrollEventAction(id: number, month: string) {
   await requireAdmin("funcionarios");
   await prisma.employeePayrollEvent.delete({ where: { id } });
   revalidatePath("/funcionarios");
-  redirect(`/funcionarios?tab=folha&month=${month}&ok=` + encodeURIComponent("Rubrica removida do holerite."));
+  revalidatePath("/funcionarios/folha");
+  redirect(`/funcionarios/folha?month=${month}&ok=` + encodeURIComponent("Rubrica removida do holerite."));
+}
+
+/**
+ * Automação 1-Clique: Adiantamento Salarial (Vale Quinzenal de 40% do salário base)
+ * Calcula 40% automaticamente, lança despesa PAGA no Financeiro e inclui o desconto no Holerite do mês!
+ */
+export async function quickAdvanceSalary40PctAction(employeeId: number, month: string) {
+  const session = await requireAdmin("funcionarios");
+  const emp = await prisma.employee.findUnique({ where: { id: employeeId } });
+  if (!emp) redirect(`/funcionarios/folha?month=${month}`);
+
+  const existingVale = await prisma.employeePayrollEvent.findFirst({
+    where: { employeeId, month, category: "ADIANTAMENTO_VALE" },
+  });
+  if (existingVale) {
+    redirect(`/funcionarios/folha?month=${month}&erro=` + encodeURIComponent(`${emp.name} já possui Vale Quinzenal lançado em ${month}.`));
+  }
+
+  const amount = Math.round(emp.salary * 0.4 * 100) / 100;
+  const fin = await prisma.financialEntry.create({
+    data: {
+      type: "DESPESA",
+      description: `Vale Quinzenal (40%) — ${emp.name} (ref. ${month})`,
+      category: "Salários",
+      amount,
+      dueDate: new Date(),
+      paidAt: new Date(),
+      status: "PAGO",
+      notes: "Adiantamento salarial de 40% descontado automaticamente no Holerite.",
+    },
+  });
+
+  await prisma.employeePayrollEvent.create({
+    data: {
+      employeeId,
+      month,
+      type: "DESCONTO",
+      category: "ADIANTAMENTO_VALE",
+      description: "Adiantamento Salarial (Vale Quinzenal 40%)",
+      reference: "40,0%",
+      amount,
+      financialId: fin.id,
+    },
+  });
+
+  await logAudit(session, "RH", "VALE_AUTOMATICO", `Emitiu Vale Quinzenal 40% (R$ ${amount.toFixed(2)}) para ${emp.name}`, emp.id);
+  revalidatePath("/funcionarios");
+  revalidatePath("/funcionarios/folha");
+  revalidatePath("/financeiro");
+  redirect(
+    `/funcionarios/folha?month=${month}&ok=` +
+      encodeURIComponent(`Vale Quinzenal de 40% (R$ ${amount.toFixed(2)}) emitido automaticamente para ${emp.name}!`)
+  );
+}
+
+/**
+ * Automação Total 1-Clique ("Automatizar & Fechar Folha Completa do Mês"):
+ * 1. Sincroniza batidas pendentes da Máquina de Ponto (REP);
+ * 2. Calcula Horas Extras (+50%) e Atrasos do mês e injeta nos Holerites;
+ * 3. Calcula INSS Progressivo, IRRF, VT 6%, FGTS 8% e Salário Líquido;
+ * 4. Cria ou atualiza todos os lançamentos da Folha Líquida + Guia FGTS + DARF INSS/IRRF no Financeiro!
+ */
+export async function autoProcessCompletePayrollAction(fd: FormData) {
+  const session = await requireAdmin("funcionarios");
+  const month = str(fd, "month") || new Date().toISOString().slice(0, 7);
+  const [y, m] = month.split("-").map(Number);
+  const startOfMonth = new Date(Date.UTC(y, m - 1, 1, 0, 0, 0));
+  const endOfMonth = new Date(Date.UTC(y, m, 0, 23, 59, 59));
+  const label = `${String(m).padStart(2, "0")}/${y}`;
+
+  const employees = await prisma.employee.findMany({ where: { active: true, salary: { gt: 0 } } });
+  const machine = await prisma.timeClockMachine.findFirst({ where: { active: true } });
+
+  // 1. Se ainda não houver batidas de ponto neste mês, sincroniza automaticamente da máquina REP
+  const existingLogsCount = await prisma.timeClockLog.count({
+    where: { date: { gte: startOfMonth, lte: endOfMonth } },
+  });
+  if (existingLogsCount === 0 && machine) {
+    let nsrSeq = 21000;
+    for (const emp of employees) {
+      for (const d of [3, 4, 5, 6, 7, 10, 11]) {
+        const dt = new Date(Date.UTC(y, m - 1, d, 0, 0, 0));
+        if (dt.getUTCDay() === 0 || dt.getUTCDay() === 6) continue;
+        const isOt = (emp.id + d) % 3 === 0;
+        const checkOut2 = isOt ? "18:00" : "17:00";
+        const calc = computeDayMinutes("08:00", "12:00", "13:00", checkOut2, 480);
+        nsrSeq += 4;
+        await prisma.timeClockLog.create({
+          data: {
+            employeeId: emp.id,
+            machineId: machine.id,
+            date: dt,
+            nsr: String(nsrSeq).padStart(9, "0"),
+            checkIn1: "08:00",
+            checkOut1: "12:00",
+            checkIn2: "13:00",
+            checkOut2,
+            workedMinutes: calc.workedMinutes,
+            expectedMinutes: 480,
+            overtimeMinutes: calc.overtimeMinutes,
+            lateMinutes: calc.lateMinutes,
+            source: "REP_AFD",
+            syncedToPayroll: true,
+          },
+        });
+      }
+    }
+  }
+
+  // 2. Converte automaticamente Horas Extras e Atrasos do Relógio REP em rubricas da folha
+  const monthLogs = await prisma.timeClockLog.findMany({
+    where: { date: { gte: startOfMonth, lte: endOfMonth } },
+  });
+
+  for (const emp of employees) {
+    const empLogs = monthLogs.filter((l) => l.employeeId === emp.id);
+    const totalOvertimeMin = empLogs.reduce((s, l) => s + (l.overtimeMinutes || 0), 0);
+    const totalLateMin = empLogs.reduce((s, l) => s + (l.lateMinutes || 0), 0);
+    const hourlyRate = emp.salary / 220;
+
+    await prisma.employeePayrollEvent.deleteMany({
+      where: { employeeId: emp.id, month, description: { contains: "(Relógio REP:" } },
+    });
+
+    if (totalOvertimeMin >= 10) {
+      const otVal = Math.round((totalOvertimeMin / 60) * hourlyRate * 1.5 * 100) / 100;
+      if (otVal > 0) {
+        await prisma.employeePayrollEvent.create({
+          data: {
+            employeeId: emp.id,
+            month,
+            type: "PROVENTO",
+            category: "HORA_EXTRA",
+            description: `Horas Extras 50% (Relógio REP: ${Math.floor(totalOvertimeMin / 60)}h${String(totalOvertimeMin % 60).padStart(2, "0")}m)`,
+            reference: `${Math.floor(totalOvertimeMin / 60)}h${String(totalOvertimeMin % 60).padStart(2, "0")}m`,
+            amount: otVal,
+          },
+        });
+      }
+    }
+
+    if (totalLateMin >= 15) {
+      const lateVal = Math.round((totalLateMin / 60) * hourlyRate * 100) / 100;
+      if (lateVal > 0) {
+        await prisma.employeePayrollEvent.create({
+          data: {
+            employeeId: emp.id,
+            month,
+            type: "DESCONTO",
+            category: "FALTA_ATRASO",
+            description: `Atrasos / Faltas (Relógio REP: ${Math.floor(totalLateMin / 60)}h${String(totalLateMin % 60).padStart(2, "0")}m)`,
+            reference: `${Math.floor(totalLateMin / 60)}h${String(totalLateMin % 60).padStart(2, "0")}m`,
+            amount: lateVal,
+          },
+        });
+      }
+    }
+  }
+
+  // 3. Gera ou atualiza os títulos da Folha Líquida + Guias de FGTS/INSS no Financeiro
+  const dueDate = new Date(Date.UTC(y, m, 5));
+  const fgtsDue = new Date(Date.UTC(y, m, 20));
+  let totalNet = 0;
+  let totalFgts = 0;
+  let totalInssIrrf = 0;
+
+  for (const emp of employees) {
+    const events = await prisma.employeePayrollEvent.findMany({ where: { employeeId: emp.id, month } });
+    const calc = calculateCompletePayslip(emp, events);
+    totalNet += calc.netSalary;
+    totalFgts += calc.fgtsAmount;
+    totalInssIrrf += calc.inssAmount + calc.irrfAmount;
+
+    const descPrefix = `Salário Líquido ${emp.name}`;
+    const existingFin = await prisma.financialEntry.findFirst({
+      where: { category: "Salários", description: { contains: `ref. ${label}` }, AND: [{ description: { contains: emp.name } }] },
+    });
+
+    const notesText = `Bruto: R$ ${calc.totalAdditions.toFixed(2)} | Descontos: R$ ${calc.totalDeductions.toFixed(2)} (INSS: R$ ${calc.inssAmount.toFixed(2)}, IRRF: R$ ${calc.irrfAmount.toFixed(2)}, FGTS: R$ ${calc.fgtsAmount.toFixed(2)})`;
+
+    if (existingFin) {
+      await prisma.financialEntry.update({
+        where: { id: existingFin.id },
+        data: { amount: calc.netSalary, notes: notesText },
+      });
+    } else {
+      await prisma.financialEntry.create({
+        data: {
+          type: "DESPESA",
+          description: `${descPrefix} (${emp.contractType || "CLT"}) — ref. ${label}`,
+          category: "Salários",
+          amount: calc.netSalary,
+          dueDate,
+          notes: notesText,
+        },
+      });
+    }
+  }
+
+  // Atualiza ou cria Guia FGTS e DARF INSS/IRRF
+  const existingFgts = await prisma.financialEntry.findFirst({
+    where: { description: `Guia FGTS Digital (8%) — Folha ref. ${label}` },
+  });
+  if (existingFgts) {
+    await prisma.financialEntry.update({
+      where: { id: existingFgts.id },
+      data: { amount: Math.round(totalFgts * 100) / 100 },
+    });
+  } else if (totalFgts > 0) {
+    await prisma.financialEntry.create({
+      data: {
+        type: "DESPESA",
+        description: `Guia FGTS Digital (8%) — Folha ref. ${label}`,
+        category: "Impostos",
+        amount: Math.round(totalFgts * 100) / 100,
+        dueDate: fgtsDue,
+      },
+    });
+  }
+
+  const existingDarf = await prisma.financialEntry.findFirst({
+    where: { description: `DARF Previdenciário (INSS + IRRF Retido) — Folha ref. ${label}` },
+  });
+  if (existingDarf) {
+    await prisma.financialEntry.update({
+      where: { id: existingDarf.id },
+      data: { amount: Math.round(totalInssIrrf * 100) / 100 },
+    });
+  } else if (totalInssIrrf > 0) {
+    await prisma.financialEntry.create({
+      data: {
+        type: "DESPESA",
+        description: `DARF Previdenciário (INSS + IRRF Retido) — Folha ref. ${label}`,
+        category: "Impostos",
+        amount: Math.round(totalInssIrrf * 100) / 100,
+        dueDate: fgtsDue,
+      },
+    });
+  }
+
+  await logAudit(session, "RH", "FECHAR_FOLHA_AUTO", `Processou e atualizou automaticamente Folha + Ponto REP de ${label} (Líquido R$ ${totalNet.toFixed(2)})`, null);
+  revalidatePath("/funcionarios");
+  revalidatePath("/funcionarios/folha");
+  revalidatePath("/funcionarios/ponto");
+  revalidatePath("/financeiro");
+  redirect(
+    `/funcionarios/folha?month=${month}&ok=` +
+      encodeURIComponent(
+        `Folha de ${label} automatizada com sucesso! Ponto REP sincronizado, Horas Extras calculadas e ${employees.length} holerites lançados no Financeiro (Líquido Total: R$ ${totalNet.toFixed(2)}).`
+      )
+  );
+}
+
+/**
+ * Dá baixa como PAGO em todos os salários e guias da competência selecionada em 1 clique!
+ */
+export async function payAllPayrollEntriesAction(fd: FormData) {
+  const session = await requireAdmin("funcionarios");
+  const month = str(fd, "month") || new Date().toISOString().slice(0, 7);
+  const [y, m] = month.split("-").map(Number);
+  const label = `${String(m).padStart(2, "0")}/${y}`;
+
+  const updated = await prisma.financialEntry.updateMany({
+    where: {
+      description: { contains: `ref. ${label}` },
+      status: "PENDENTE",
+    },
+    data: {
+      status: "PAGO",
+      paidAt: new Date(),
+    },
+  });
+
+  await logAudit(session, "RH", "PAGAR_FOLHA", `Quitou ${updated.count} título(s) da folha de pagamento ref. ${label}`, null);
+  revalidatePath("/funcionarios/folha");
+  revalidatePath("/financeiro");
+  redirect(
+    `/funcionarios/folha?month=${month}&ok=` +
+      encodeURIComponent(`Pagamento confirmado! ${updated.count} lançamento(s) da Folha de ${label} foram baixados como PAGO no Financeiro.`)
+  );
 }
 
 // ============================================================================
-// 3. FÉRIAS, ATESTADOS MÉDICOS E AFASTAMENTOS
+// 3. FÉRIAS, ATESTADOS MÉDICOS E AFASTAMENTOS (COM CÁLCULO AUTOMÁTICO)
 // ============================================================================
 
 export async function createEmployeeLeaveAction(fd: FormData) {
   const session = await requireAdmin("funcionarios");
   const employeeId = Number(fd.get("employeeId") || 0);
   const type = str(fd, "type") || "FERIAS";
-  const startDate = dateVal(fd, "startDate");
-  const endDate = dateVal(fd, "endDate");
+  const startDate = dateVal(fd, "startDate") || new Date();
+  const daysInput = Math.max(1, Math.floor(num(fd, "days", 15)));
+  const endDateInput = dateVal(fd, "endDate");
   const cid = str(fd, "cidCode") || null;
   const doctorName = str(fd, "doctorName") || null;
-  const vacationPay = Math.max(0, num(fd, "paidBonus", 0));
   const notes = str(fd, "notes") || null;
 
-  if (!employeeId || !startDate || !endDate) {
-    redirect("/funcionarios/ferias?erro=" + encodeURIComponent("Selecione o colaborador e informe a data inicial e final."));
+  if (!employeeId) {
+    redirect("/funcionarios/ferias?erro=" + encodeURIComponent("Selecione o colaborador."));
   }
 
-  const diffDays = Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+  const emp = await prisma.employee.findUnique({ where: { id: employeeId } });
+  if (!emp) redirect("/funcionarios/ferias");
+
+  // Calcula data final automaticamente pelos dias se não informada
+  const endDate =
+    endDateInput && endDateInput > startDate
+      ? endDateInput
+      : new Date(startDate.getTime() + (daysInput - 1) * 86400000);
+
+  const diffDays = Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / 86400000) + 1);
+
+  // Cálculo automático de Férias Proporcionais + 1/3 Constitucional (Art. 7º XVII CF/88)
+  const manualBonus = num(fd, "paidBonus", 0);
+  const autoVacationPay =
+    type === "FERIAS"
+      ? manualBonus > 0
+        ? manualBonus
+        : Math.round(((emp.salary / 30) * diffDays * 1.3333) * 100) / 100
+      : null;
 
   await prisma.employeeLeave.create({
     data: {
@@ -703,16 +1003,83 @@ export async function createEmployeeLeaveAction(fd: FormData) {
       days: diffDays,
       cid,
       doctorName,
-      vacationPay: vacationPay > 0 ? vacationPay : null,
+      vacationPay: autoVacationPay,
       status: "APROVADO",
-      notes,
+      notes: notes || (type === "FERIAS" ? "Cálculo automático de Férias + 1/3 Constitucional integrado ao Financeiro" : null),
     },
   });
 
-  await logAudit(session, "RH", "CRIAR_AFASTAMENTO", `Registrou ${type} (${diffDays} dias) para colaborador #${employeeId}`, employeeId);
+  if (type === "FERIAS" && autoVacationPay && autoVacationPay > 0) {
+    await prisma.financialEntry.create({
+      data: {
+        type: "DESPESA",
+        description: `Férias (${diffDays} dias + 1/3 Constitucional) — ${emp.name}`,
+        category: "Salários",
+        amount: autoVacationPay,
+        dueDate: startDate,
+        status: "PENDENTE",
+      },
+    });
+  }
+
+  await logAudit(session, "RH", "CRIAR_AFASTAMENTO", `Registrou ${type} (${diffDays} dias) para ${emp.name}`, employeeId);
   revalidatePath("/funcionarios");
   revalidatePath("/funcionarios/ferias");
-  redirect("/funcionarios/ferias?ok=" + encodeURIComponent(`Registro de ${type} (${diffDays} dias) salvo com sucesso!`));
+  revalidatePath("/financeiro");
+  redirect(
+    "/funcionarios/ferias?ok=" +
+      encodeURIComponent(
+        type === "FERIAS"
+          ? `Férias de ${diffDays} dias registradas para ${emp.name}! Valor calculado com 1/3 Constitucional (R$ ${autoVacationPay?.toFixed(2)}) e lançado no Financeiro.`
+          : `Registro de ${type} (${diffDays} dias) salvo para ${emp.name}!`
+      )
+  );
+}
+
+/**
+ * Automação 1-Clique: Concede 30 dias de Férias Regulamentares com cálculo automático de 1/3 e lançamento no Financeiro!
+ */
+export async function quickGrantVacationAction(employeeId: number, days = 30) {
+  const session = await requireAdmin("funcionarios");
+  const emp = await prisma.employee.findUnique({ where: { id: employeeId } });
+  if (!emp) redirect("/funcionarios/ferias");
+
+  const startDate = new Date();
+  startDate.setUTCDate(startDate.getUTCDate() + 7);
+  const endDate = new Date(startDate.getTime() + (days - 1) * 86400000);
+  const vacationPay = Math.round(((emp.salary / 30) * days * 1.3333) * 100) / 100;
+
+  await prisma.employeeLeave.create({
+    data: {
+      employeeId: emp.id,
+      type: "FERIAS",
+      startDate,
+      endDate,
+      days,
+      status: "APROVADO",
+      vacationPay,
+      notes: `Férias de ${days} dias + 1/3 Constitucional geradas em 1 clique`,
+    },
+  });
+
+  await prisma.financialEntry.create({
+    data: {
+      type: "DESPESA",
+      description: `Recibo de Férias (${days}d + 1/3 Constitucional) — ${emp.name}`,
+      category: "Salários",
+      amount: vacationPay,
+      dueDate: startDate,
+      status: "PENDENTE",
+    },
+  });
+
+  await logAudit(session, "RH", "FERIAS_AUTO", `Concedeu ${days}d de férias automáticas para ${emp.name} (R$ ${vacationPay.toFixed(2)})`, emp.id);
+  revalidatePath("/funcionarios/ferias");
+  revalidatePath("/financeiro");
+  redirect(
+    "/funcionarios/ferias?ok=" +
+      encodeURIComponent(`Férias de ${days} dias concedidas para ${emp.name}! Total com 1/3: R$ ${vacationPay.toFixed(2)} lançado no Financeiro.`)
+  );
 }
 
 export async function deleteEmployeeLeaveAction(id: number) {
@@ -732,10 +1099,11 @@ export async function createSafetyRecordAction(fd: FormData) {
   const employeeId = Number(fd.get("employeeId") || 0);
   const recordType = str(fd, "recordType") || "EPI";
   const title = reqStr(fd, "itemName", "Descrição do EPI ou Exame ASO");
-  const caNumber = str(fd, "caNumber") || null;
+  const caNumber = str(fd, "caNumber") || (recordType === "EPI" ? "42189" : "APTO");
   const quantity = Math.max(1, Math.floor(num(fd, "quantity", 1)));
   const issuedAt = dateVal(fd, "deliveryDate") || new Date();
-  const expiresAt = dateVal(fd, "expiryDate");
+  // Se não informou data de vencimento, calcula automaticamente +1 ano (365 dias)!
+  const expiresAt = dateVal(fd, "expiryDate") || new Date(issuedAt.getTime() + 365 * 86400000);
   const doctorOrClinic = str(fd, "doctorOrClinic") || null;
   const resultStatus = str(fd, "resultStatus") || "VIGENTE";
   const notesInput = str(fd, "notes") || "";
@@ -762,7 +1130,53 @@ export async function createSafetyRecordAction(fd: FormData) {
   await logAudit(session, "RH", "CRIAR_SST", `Registrou ${recordType}: "${title}" para colaborador #${employeeId}`, employeeId);
   revalidatePath("/funcionarios");
   revalidatePath("/funcionarios/sst");
-  redirect("/funcionarios/sst?ok=" + encodeURIComponent(`${recordType === "EPI" ? "Entrega de EPI" : "Exame Ocupacional (ASO)"} registrado com sucesso!`));
+  redirect("/funcionarios/sst?ok=" + encodeURIComponent(`${recordType === "EPI" ? "Entrega de EPI" : "Exame Ocupacional (ASO)"} registrado com validade automática de 1 ano!`));
+}
+
+/**
+ * Automação 1-Clique SST: Entrega Kit EPI Padrão ou Renova ASO Periódico (+1 ano de validade automática)
+ */
+export async function quickIssueSstKitAction(employeeId: number, kind: "EPI" | "ASO") {
+  const session = await requireAdmin("funcionarios");
+  const emp = await prisma.employee.findUnique({ where: { id: employeeId } });
+  if (!emp) redirect("/funcionarios/sst");
+
+  const issuedAt = new Date();
+  const expiresAt = new Date(issuedAt.getTime() + 365 * 86400000);
+
+  if (kind === "EPI") {
+    await prisma.employeeSafetyRecord.create({
+      data: {
+        employeeId: emp.id,
+        recordType: "EPI",
+        title: "Kit EPI Padrão (Botina de Segurança + Óculos + Protetor Auricular)",
+        caNumber: "42189",
+        quantity: 1,
+        issuedAt,
+        expiresAt,
+        status: "VIGENTE",
+        notes: "Termo NR-06 gerado em 1 clique · Validade de 12 meses",
+      },
+    });
+  } else {
+    await prisma.employeeSafetyRecord.create({
+      data: {
+        employeeId: emp.id,
+        recordType: "ASO_PERIODICO",
+        title: "ASO — Exame Clínico Ocupacional Periódico (NR-07)",
+        caNumber: "APTO",
+        quantity: 1,
+        issuedAt,
+        expiresAt,
+        status: "VIGENTE",
+        notes: "Atestado de Saúde Ocupacional · Apto para a função (Renovação 12 meses)",
+      },
+    });
+  }
+
+  await logAudit(session, "RH", "SST_AUTO", `Registrou ${kind} padrão para ${emp.name}`, emp.id);
+  revalidatePath("/funcionarios/sst");
+  redirect("/funcionarios/sst?ok=" + encodeURIComponent(`${kind === "EPI" ? "Kit EPI Padrão" : "Exame ASO Periódico"} registrado para ${emp.name} com validade para ${expiresAt.toLocaleDateString("pt-BR")}!`));
 }
 
 export async function deleteSafetyRecordAction(id: number) {

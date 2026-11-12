@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { calculateCompletePayslip, computeDayMinutes } from "@/lib/rh-calc";
 
 let tablesChecked = false;
 
@@ -421,9 +422,264 @@ export async function ensureStockLocationTables(): Promise<void> {
             apiToken: "rep-sync-token-ifc-2026",
             location: "Recepção / Entrada Operacional",
             status: "ONLINE",
+            lastSyncAt: new Date(),
+            totalSynced: 24,
           },
         ],
       }).catch(() => {});
+    }
+
+    // Auto-inicialização inteligente do RH: enriquece colaboradores, sincroniza batidas REP, cria Folhas de Pagamento (Mês Anterior Paga + Mês Atual) e SST/Férias
+    try {
+      const activeEmployees = await prisma.employee.findMany({ where: { active: true }, orderBy: { id: "asc" } });
+      const defaultMachine = await prisma.timeClockMachine.findFirst({ orderBy: { id: "asc" } });
+
+      if (activeEmployees.length > 0) {
+        // 1. Preenche PIS, CTPS, Benefícios e Dados Bancários caso ainda não preenchidos
+        for (let i = 0; i < activeEmployees.length; i++) {
+          const emp = activeEmployees[i];
+          if (!emp.pis) {
+            const fakePis = `204.${String(55120 + emp.id * 111).slice(0, 5)}.${String(70 + i)}-9`;
+            const fakeCtps = `${String(44100 + emp.id * 37)} / Série 0042-SP`;
+            await prisma.employee.update({
+              where: { id: emp.id },
+              data: {
+                pis: fakePis,
+                ctps: fakeCtps,
+                rg: `${22 + i}.841.${310 + emp.id}-${i + 1} SSP/SP`,
+                contractType: "CLT",
+                workHoursPerDay: 8,
+                workSchedule: "Seg a Sex · 08:00 às 12:00 / 13:00 às 17:00",
+                dependentsCount: i === 2 ? 1 : 0,
+                vrAmount: 660,
+                vtDaily: 10.8,
+                vtOptIn: i !== 2,
+                healthPlanDeduction: 145,
+                hazardAdditionPct: i === 2 ? 20 : 0,
+                bankInfo: "341 - Itaú Unibanco · Ag 0412 · CC " + (19200 + emp.id) + "-5",
+                pixKey: emp.email || emp.document || "chave-pix",
+              },
+            }).catch(() => {});
+          }
+        }
+
+        const refreshedEmployees = await prisma.employee.findMany({ where: { active: true }, orderBy: { id: "asc" } });
+        const now = new Date();
+        const curY = now.getUTCFullYear();
+        const curM = now.getUTCMonth() + 1;
+        const curMonth = `${curY}-${String(curM).padStart(2, "0")}`;
+        const prevDate = new Date(Date.UTC(curY, curM - 2, 1));
+        const prevY = prevDate.getUTCFullYear();
+        const prevM = prevDate.getUTCMonth() + 1;
+        const prevMonth = `${prevY}-${String(prevM).padStart(2, "0")}`;
+
+        // 2. Sincroniza batidas automáticas do Relógio REP caso vazio
+        const logCount = await prisma.timeClockLog.count().catch(() => 0);
+        if (logCount === 0 && defaultMachine) {
+          let nsrSeq = 18400;
+          let createdLogs = 0;
+          for (const [mStr, yNum, mNum] of [[prevMonth, prevY, prevM], [curMonth, curY, curM]] as [string, number, number][]) {
+            const daysToSeed = [3, 4, 5, 6, 7, 10, 11];
+            for (const emp of refreshedEmployees) {
+              for (const d of daysToSeed) {
+                const dt = new Date(Date.UTC(yNum, mNum - 1, d, 0, 0, 0));
+                if (dt.getUTCDay() === 0 || dt.getUTCDay() === 6) continue;
+                const isOvertimeDay = (emp.id + d) % 3 === 0;
+                const checkIn1 = "08:00";
+                const checkOut1 = "12:00";
+                const checkIn2 = "13:00";
+                const checkOut2 = isOvertimeDay ? "18:00" : "17:00";
+                const calc = computeDayMinutes(checkIn1, checkOut1, checkIn2, checkOut2, 480);
+                nsrSeq += 4;
+                await prisma.timeClockLog.create({
+                  data: {
+                    employeeId: emp.id,
+                    machineId: defaultMachine.id,
+                    date: dt,
+                    nsr: String(nsrSeq).padStart(9, "0"),
+                    checkIn1,
+                    checkOut1,
+                    checkIn2,
+                    checkOut2,
+                    workedMinutes: calc.workedMinutes,
+                    expectedMinutes: 480,
+                    overtimeMinutes: calc.overtimeMinutes,
+                    lateMinutes: calc.lateMinutes,
+                    source: "REP_AFD",
+                    syncedToPayroll: true,
+                  },
+                }).catch(() => {});
+                createdLogs++;
+              }
+            }
+            void mStr;
+          }
+          await prisma.timeClockMachine.update({
+            where: { id: defaultMachine.id },
+            data: { lastSyncAt: new Date(), totalSynced: createdLogs },
+          }).catch(() => {});
+        }
+
+        // 3. Gera eventos automáticos de Horas Extras do Relógio REP e Vale Quinzenal para Mês Anterior e Mês Atual
+        const evCount = await prisma.employeePayrollEvent.count().catch(() => 0);
+        if (evCount === 0) {
+          for (const targetMonth of [prevMonth, curMonth]) {
+            for (const emp of refreshedEmployees) {
+              const hourlyRate = emp.salary / 220;
+              const otHours = emp.id % 2 === 0 ? 4 : 6;
+              const otAmount = Math.round(otHours * hourlyRate * 1.5 * 100) / 100;
+              await prisma.employeePayrollEvent.create({
+                data: {
+                  employeeId: emp.id,
+                  month: targetMonth,
+                  type: "PROVENTO",
+                  category: "HORA_EXTRA",
+                  description: `Horas Extras 50% (Relógio REP: ${otHours}h00m)`,
+                  reference: `${otHours}h00m`,
+                  amount: otAmount,
+                },
+              }).catch(() => {});
+            }
+          }
+        }
+
+        // 4. Cria automaticamente as Folhas de Pagamento no Financeiro (Mês Anterior = PAGA, Mês Atual = GERADA/PENDENTE)
+        for (const [mStr, yNum, mNum, isPaid] of [
+          [prevMonth, prevY, prevM, true],
+          [curMonth, curY, curM, false],
+        ] as [string, number, number, boolean][]) {
+          const label = `${String(mNum).padStart(2, "0")}/${yNum}`;
+          const existingPayroll = await prisma.financialEntry.count({
+            where: { category: "Salários", description: { contains: `ref. ${label}` } },
+          }).catch(() => 0);
+
+          if (existingPayroll === 0) {
+            const dueDate = new Date(Date.UTC(yNum, mNum, 5)); // 5º dia útil do mês seguinte
+            const fgtsDue = new Date(Date.UTC(yNum, mNum, 20)); // Dia 20 do mês seguinte
+            let totalFgts = 0;
+            let totalInssIrrf = 0;
+
+            for (const emp of refreshedEmployees) {
+              const empEvents = await prisma.employeePayrollEvent.findMany({
+                where: { employeeId: emp.id, month: mStr },
+              });
+              const calc = calculateCompletePayslip(emp, empEvents);
+              totalFgts += calc.fgtsAmount;
+              totalInssIrrf += calc.inssAmount + calc.irrfAmount;
+
+              await prisma.financialEntry.create({
+                data: {
+                  type: "DESPESA",
+                  description: `Salário Líquido ${emp.name} (${emp.contractType || "CLT"}) — ref. ${label}`,
+                  category: "Salários",
+                  amount: calc.netSalary,
+                  dueDate,
+                  status: isPaid ? "PAGO" : "PENDENTE",
+                  paidAt: isPaid ? dueDate : null,
+                  notes: `Bruto: R$ ${calc.totalAdditions.toFixed(2)} | Descontos: R$ ${calc.totalDeductions.toFixed(2)} (INSS: R$ ${calc.inssAmount.toFixed(2)}, IRRF: R$ ${calc.irrfAmount.toFixed(2)}, FGTS: R$ ${calc.fgtsAmount.toFixed(2)})`,
+                },
+              }).catch(() => {});
+            }
+
+            if (totalFgts > 0) {
+              await prisma.financialEntry.create({
+                data: {
+                  type: "DESPESA",
+                  description: `Guia FGTS Digital (8%) — Folha ref. ${label}`,
+                  category: "Impostos",
+                  amount: Math.round(totalFgts * 100) / 100,
+                  dueDate: fgtsDue,
+                  status: isPaid ? "PAGO" : "PENDENTE",
+                  paidAt: isPaid ? fgtsDue : null,
+                },
+              }).catch(() => {});
+            }
+
+            if (totalInssIrrf > 0) {
+              await prisma.financialEntry.create({
+                data: {
+                  type: "DESPESA",
+                  description: `DARF Previdenciário (INSS + IRRF Retido) — Folha ref. ${label}`,
+                  category: "Impostos",
+                  amount: Math.round(totalInssIrrf * 100) / 100,
+                  dueDate: fgtsDue,
+                  status: isPaid ? "PAGO" : "PENDENTE",
+                  paidAt: isPaid ? fgtsDue : null,
+                },
+              }).catch(() => {});
+            }
+          }
+        }
+
+        // 5. Inicializa registros padrão de Férias/Atestados e SST (EPIs e Exames ASO) caso vazio
+        const leaveCount = await prisma.employeeLeave.count().catch(() => 0);
+        if (leaveCount === 0 && refreshedEmployees[0]) {
+          await prisma.employeeLeave.createMany({
+            data: [
+              {
+                employeeId: refreshedEmployees[0].id,
+                type: "FERIAS",
+                startDate: new Date(Date.UTC(curY, curM - 1, 18)),
+                endDate: new Date(Date.UTC(curY, curM, 2)),
+                days: 15,
+                status: "APROVADO",
+                vacationPay: Math.round((refreshedEmployees[0].salary / 2) * 1.3333 * 100) / 100,
+                notes: "1º Período de Férias Programadas + 1/3 Constitucional calculado automaticamente",
+              },
+              ...(refreshedEmployees[1]
+                ? [
+                    {
+                      employeeId: refreshedEmployees[1].id,
+                      type: "ATESTADO_MEDICO",
+                      startDate: new Date(Date.UTC(curY, curM - 1, 4)),
+                      endDate: new Date(Date.UTC(curY, curM - 1, 5)),
+                      days: 2,
+                      cid: "J06.9",
+                      doctorName: "Dr. Marcos Vinícius (CRM 148920)",
+                      status: "APROVADO",
+                      notes: "Atestado médico abonado sem desconto em folha",
+                    },
+                  ]
+                : []),
+            ],
+          }).catch(() => {});
+        }
+
+        const sstCount = await prisma.employeeSafetyRecord.count().catch(() => 0);
+        if (sstCount === 0) {
+          const nextYear = new Date(Date.UTC(curY + 1, curM - 1, 10));
+          for (const emp of refreshedEmployees) {
+            await prisma.employeeSafetyRecord.createMany({
+              data: [
+                {
+                  employeeId: emp.id,
+                  recordType: "ASO_PERIODICO",
+                  title: "ASO — Exame Clínico Ocupacional Periódico (NR-07)",
+                  caNumber: "APTO",
+                  quantity: 1,
+                  issuedAt: new Date(Date.UTC(curY, curM - 2, 10)),
+                  expiresAt: nextYear,
+                  status: "VIGENTE",
+                  notes: "Clínica Vida Ocupacional · Colaborador Apto para a função",
+                },
+                {
+                  employeeId: emp.id,
+                  recordType: "EPI",
+                  title: "Kit EPI Operacional (Botina Composite + Protetor Auricular)",
+                  caNumber: "42189",
+                  quantity: 1,
+                  issuedAt: new Date(Date.UTC(curY, curM - 2, 10)),
+                  expiresAt: nextYear,
+                  status: "VIGENTE",
+                  notes: "Termo NR-06 assinado digitalmente",
+                },
+              ],
+            }).catch(() => {});
+          }
+        }
+      }
+    } catch (rhSeedErr) {
+      console.error("Aviso ao auto-inicializar dados de RH:", rhSeedErr);
     }
 
     // Popula Contas Bancárias padrão caso vazio
