@@ -1,7 +1,9 @@
 import Link from "next/link";
 import {
   CheckCircle2,
+  Clock,
   FileSpreadsheet,
+  FileText,
   Plus,
   Printer,
   RefreshCw,
@@ -134,12 +136,20 @@ export default async function FolhaPagamentoPage({ searchParams }: { searchParam
         <div className="stat primary">
           <div className="label">Salário Líquido Total a Pagar ({label})</div>
           <div className="value">{brl(totalNet)}</div>
-          <div className="hint">
-            {isAllPaid
-              ? "✅ Folha 100% Paga no Financeiro"
-              : payrollFinancialEntries.length > 0
-                ? "📋 Gerada no Financeiro (Aguardando Baixa)"
-                : "⏳ Aguardando Fechamento"}
+          <div className="hint" style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+            {isAllPaid ? (
+              <>
+                <CheckCircle2 size={13} /> Folha 100% Paga no Financeiro
+              </>
+            ) : payrollFinancialEntries.length > 0 ? (
+              <>
+                <FileText size={13} /> Gerada no Financeiro (Aguardando Baixa)
+              </>
+            ) : (
+              <>
+                <Clock size={13} /> Aguardando Fechamento
+              </>
+            )}
           </div>
         </div>
         <div className="stat warn">
@@ -237,10 +247,11 @@ export default async function FolhaPagamentoPage({ searchParams }: { searchParam
                     {vales === 0 && (
                       <ConfirmButton
                         action={quickAdvanceSalary40PctAction.bind(null, emp.id, refMonth)}
-                        label="⚡ Vale 40%"
                         className="btn sm secondary"
                         confirmText={`Emitir Adiantamento Salarial (Vale Quinzenal de 40% = ${brl(emp.salary * 0.4)}) para ${emp.name}? O valor será lançado como despesa no Financeiro e descontado automaticamente neste Holerite.`}
-                      />
+                      >
+                        <Zap size={13} /> Vale 40%
+                      </ConfirmButton>
                     )}
                     <Link
                       className="btn sm"
@@ -409,11 +420,11 @@ export default async function FolhaPagamentoPage({ searchParams }: { searchParam
               <div className="field s6">
                 <label>Tipo de Lançamento *</label>
                 <select name="category" defaultValue="BONUS_PREMIO">
-                  <option value="BONUS_PREMIO">🏆 Bônus / Gratificação (+ Provento)</option>
-                  <option value="HORA_EXTRA_100">⏱️ Hora Extra 100% Feriado (+ Provento)</option>
-                  <option value="ADICIONAL_NOTURNO">🌙 Adicional Noturno 20% (+ Provento)</option>
-                  <option value="ADIANTAMENTO_VALE">💸 Vale Salarial Valor Livre (- Desconto)</option>
-                  <option value="FALTA_ATRASO">⚠️ Desconto de Falta (- Desconto)</option>
+                  <option value="BONUS_PREMIO">Bônus / Gratificação (+ Provento)</option>
+                  <option value="HORA_EXTRA_100">Hora Extra 100% Feriado (+ Provento)</option>
+                  <option value="ADICIONAL_NOTURNO">Adicional Noturno 20% (+ Provento)</option>
+                  <option value="ADIANTAMENTO_VALE">Vale Salarial Valor Livre (- Desconto)</option>
+                  <option value="FALTA_ATRASO">Desconto de Falta (- Desconto)</option>
                 </select>
               </div>
               <div className="field s6">

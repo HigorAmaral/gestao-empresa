@@ -1,4 +1,4 @@
-import { Calendar, Clock, Plus } from "lucide-react";
+import { AlertTriangle, Calendar, CheckCircle2, Clock, Palmtree, Plus } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
 import { spStr } from "@/lib/form";
@@ -76,12 +76,15 @@ export default async function FeriasAtestadosPage({ searchParams }: { searchPara
 
                 let badgeClass = "blue";
                 let statusText = `Em Aquisição (${cycleMonths}/12 avos)`;
+                let statusIcon = <Clock size={12} />;
                 if (monthsWorked >= 22) {
                   badgeClass = "red";
-                  statusText = "⚠️ Vencendo Limite Concessivo";
+                  statusText = "Vencendo Limite Concessivo";
+                  statusIcon = <AlertTriangle size={12} />;
                 } else if (completedYears >= 1) {
                   badgeClass = "yellow";
                   statusText = `Direito Adquirido (${completedYears}º ciclo)`;
+                  statusIcon = <CheckCircle2 size={12} />;
                 }
 
                 return (
@@ -92,22 +95,27 @@ export default async function FeriasAtestadosPage({ searchParams }: { searchPara
                       <div className="small muted">{monthsWorked} meses</div>
                     </td>
                     <td>
-                      <span className={`badge ${badgeClass}`}>{statusText}</span>
+                      <span className={`badge ${badgeClass}`}>
+                        {statusIcon}
+                        <span>{statusText}</span>
+                      </span>
                     </td>
                     <td className="num bold">{brl(est30dValue)}</td>
                     <td className="actions">
                       <ConfirmButton
                         action={quickGrantVacationAction.bind(null, emp.id, 30)}
-                        label="🏖️ 30d Férias"
                         className="btn sm"
                         confirmText={`Conceder 30 dias de Férias Regulamentares para ${emp.name}? O valor de ${brl(est30dValue)} (Salário + 1/3 Constitucional) será calculado e lançado automaticamente no Financeiro.`}
-                      />
+                      >
+                        <Palmtree size={13} /> 30d Férias
+                      </ConfirmButton>
                       <ConfirmButton
                         action={quickGrantVacationAction.bind(null, emp.id, 15)}
-                        label="15d"
                         className="btn sm secondary"
                         confirmText={`Conceder 15 dias de Férias Proporcionais para ${emp.name} (${brl(est30dValue / 2)})?`}
-                      />
+                      >
+                        15d
+                      </ConfirmButton>
                     </td>
                   </tr>
                 );
@@ -141,10 +149,10 @@ export default async function FeriasAtestadosPage({ searchParams }: { searchPara
             <div className="field s4">
               <label>Tipo de Registro *</label>
               <select name="type" defaultValue="ATESTADO_MEDICO">
-                <option value="ATESTADO_MEDICO">🏥 Atestado Médico Abonado (Sem Desconto)</option>
-                <option value="FERIAS">🏖️ Férias Regulamentares (Cálculo Automático +1/3)</option>
-                <option value="LICENCA">👶 Licença Maternidade / Paternidade / Casamento</option>
-                <option value="AFASTAMENTO_INSS">🏛️ Afastamento Previdenciário INSS (&gt;15 dias)</option>
+                <option value="ATESTADO_MEDICO">Atestado Médico Abonado (Sem Desconto)</option>
+                <option value="FERIAS">Férias Regulamentares (Cálculo Automático +1/3)</option>
+                <option value="LICENCA">Licença Maternidade / Paternidade / Casamento</option>
+                <option value="AFASTAMENTO_INSS">Afastamento Previdenciário INSS (&gt;15 dias)</option>
               </select>
             </div>
             <div className="field s2">

@@ -1,4 +1,4 @@
-import { AlertTriangle, HeartPulse, Plus, ShieldCheck } from "lucide-react";
+import { AlertTriangle, HeartPulse, Plus, ShieldCheck, Stethoscope } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
 import { spStr } from "@/lib/form";
@@ -71,16 +71,18 @@ export default async function SegurancaTrabalhoSstPage({ searchParams }: { searc
                   <td className="actions">
                     <ConfirmButton
                       action={quickIssueSstKitAction.bind(null, emp.id, "EPI")}
-                      label="🦺 Entregar Kit EPI"
                       className="btn sm"
                       confirmText={`Registrar entrega de Kit EPI Padrão (CA 42189) com validade de 1 ano para ${emp.name}?`}
-                    />
+                    >
+                      <ShieldCheck size={13} /> Entregar Kit EPI
+                    </ConfirmButton>
                     <ConfirmButton
                       action={quickIssueSstKitAction.bind(null, emp.id, "ASO")}
-                      label="🩺 Renovar ASO"
                       className="btn sm secondary"
                       confirmText={`Registrar Exame Ocupacional ASO Periódico (APTO) com validade de 1 ano para ${emp.name}?`}
-                    />
+                    >
+                      <Stethoscope size={13} /> Renovar ASO
+                    </ConfirmButton>
                   </td>
                 </tr>
               ))}
@@ -113,10 +115,10 @@ export default async function SegurancaTrabalhoSstPage({ searchParams }: { searc
             <div className="field s4">
               <label>Categoria SST *</label>
               <select name="recordType" defaultValue="EPI">
-                <option value="EPI">🦺 Entrega de EPI (NR-06)</option>
-                <option value="ASO_ADMISSIONAL">🩺 ASO — Exame Admissional</option>
-                <option value="ASO_PERIODICO">🩺 ASO — Exame Periódico Anual</option>
-                <option value="ASO_DEMISSIONAL">🩺 ASO — Exame Demissional</option>
+                <option value="EPI">Entrega de EPI (NR-06)</option>
+                <option value="ASO_ADMISSIONAL">ASO — Exame Admissional</option>
+                <option value="ASO_PERIODICO">ASO — Exame Periódico Anual</option>
+                <option value="ASO_DEMISSIONAL">ASO — Exame Demissional</option>
               </select>
             </div>
             <div className="field s4">
