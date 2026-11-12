@@ -4,9 +4,11 @@ import { CheckCircle2, MessageCircle, Printer } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { brl, fmtDate, fmtDateTime, PAYMENT_METHODS, toInputDate, todayInput } from "@/lib/format";
 import { buildWhatsAppUrl, osWhatsAppMessage } from "@/lib/whatsapp";
+import { makePublicToken } from "@/lib/public-token";
 import { FlashMessages, PageHeader, StatusBadge } from "@/components/ui";
 import { ActionForm, ConfirmButton } from "@/components/Forms";
 import { ItemsEditor } from "@/components/ItemsEditor";
+import { PublicApprovalShare } from "@/components/PublicApprovalShare";
 import { cancelServiceOrder, completeServiceOrder, deleteServiceOrder, saveServiceOrder } from "../actions";
 
 type SP = Promise<Record<string, string | string[] | undefined>>;
@@ -79,6 +81,12 @@ export default async function ServiceOrderDetailPage({
             <>
               <StatusBadge status={os.priority} />
               <StatusBadge status={os.status} />
+              <PublicApprovalShare
+                relativePath={`/p/os/${os.id}?t=${makePublicToken("os", os.id)}`}
+                clientPhone={os.client?.phone}
+                whatsappMessagePrefix={`Olá${os.client?.name ? ` ${os.client.name}` : ""}! Acompanhe e autorize online a sua Ordem de Serviço #${os.id} (${os.equipment}) no valor de ${brl(os.total)}.`}
+                label="Link de Aprovação OS"
+              />
               {waUrl && (
                 <a className="btn secondary" href={waUrl} target="_blank" rel="noopener noreferrer">
                   <MessageCircle size={15} /> WhatsApp

@@ -7,6 +7,7 @@ import {
   BarChart3,
   Building2,
   ChevronRight,
+  ClipboardCheck,
   Factory,
   FileText,
   History,
@@ -14,6 +15,7 @@ import {
   LogOut,
   MapPin,
   Menu,
+  Monitor,
   Moon,
   Package,
   PackageCheck,
@@ -54,6 +56,7 @@ const SECTIONS: { title: string; items: Item[] }[] = [
   {
     title: "Comercial & Serviços",
     items: [
+      { href: "/pdv", label: "PDV (Frente de Caixa)", Icon: Monitor, moduleKey: "vendas" },
       { href: "/vendas", label: "Vendas", Icon: ShoppingCart, moduleKey: "vendas" },
       { href: "/nfe", label: "Notas Fiscais (NF-e)", Icon: FileText, moduleKey: "vendas" },
       { href: "/os", label: "Ordens de Serviço", Icon: Wrench, moduleKey: "os", alertKey: "os" },
@@ -67,6 +70,7 @@ const SECTIONS: { title: string; items: Item[] }[] = [
       { href: "/produtos", label: "Produtos", Icon: Package, moduleKey: "produtos" },
       { href: "/estoque", label: "Estoque", Icon: Warehouse, moduleKey: "estoque", alertKey: "estoque" },
       { href: "/estoque/enderecamento", label: "Endereçamento", Icon: MapPin, moduleKey: "estoque", subItem: true },
+      { href: "/estoque/inventario", label: "Inventário Físico", Icon: ClipboardCheck, moduleKey: "estoque", subItem: true },
       { href: "/recebimento", label: "Recebimento", Icon: PackageCheck, moduleKey: "estoque" },
       { href: "/compras", label: "Compras", Icon: Receipt, moduleKey: "compras" },
       { href: "/fornecedores", label: "Fornecedores", Icon: Truck, moduleKey: "fornecedores" },

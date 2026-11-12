@@ -1,6 +1,7 @@
 import { unstable_cache } from "next/cache";
 import { todayUTC } from "./format";
 import { prisma } from "./prisma";
+import { ensureStockLocationTables } from "./stock-location";
 import type { Session } from "./token";
 
 export async function logAudit(
@@ -28,6 +29,7 @@ export async function logAudit(
 
 export const getCompanySettings = unstable_cache(
   async () => {
+    await ensureStockLocationTables();
     const existing = await prisma.companySettings.findUnique({ where: { id: 1 } });
     if (existing) return existing;
     return prisma.companySettings.create({ data: { id: 1 } });

@@ -1,24 +1,37 @@
+import { Database, Download, FileSpreadsheet, ShieldCheck } from "lucide-react";
+import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
 import { getCompanySettings } from "@/lib/audit";
-import { UFS } from "@/lib/format";
 import { PageHeader } from "@/components/ui";
 import { ActionForm } from "@/components/Forms";
 import { saveCompanySettings } from "./actions";
 import { LogoUploadField } from "./LogoUploadField";
 import { ColorThemeCustomizer } from "./ColorThemeCustomizer";
+import { CompanyFiscalLookupFields } from "./CompanyFiscalLookupFields";
 
 export default async function ConfiguracoesPage() {
   await requireAdmin("configuracoes");
-  const company = await getCompanySettings();
+  const [company, clientsCount, productsCount, salesCount, finCount] = await Promise.all([
+    getCompanySettings(),
+    prisma.client.count(),
+    prisma.product.count(),
+    prisma.sale.count(),
+    prisma.financialEntry.count(),
+  ]);
 
   return (
     <>
       <PageHeader
-        title="Configurações da Empresa & Identidade Visual"
-        subtitle="Configure a logo, as cores do sistema, dados cadastrais e fiscais da empresa"
+        title="Configurações da Empresa & Governança"
+        subtitle="Configure a logo, as cores do sistema, dados cadastrais com busca de CNPJ/CEP e exporte backups completos"
+        actions={
+          <a className="btn" href="/api/backup" download>
+            <Download size={15} /> Backup Completo (.JSON)
+          </a>
+        }
       />
 
-      <div className="card">
+      <div className="card mb">
         <ActionForm action={saveCompanySettings} submitLabel="Salvar Configurações">
           {/* Seção 1: Logo da Empresa */}
           <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: "1px solid var(--border)" }}>
@@ -34,86 +47,69 @@ export default async function ConfiguracoesPage() {
             />
           </div>
 
-          {/* Seção 3: Dados Cadastrais e Fiscais */}
+          {/* Seção 3: Dados Cadastrais e Fiscais com Busca Automática de CNPJ/CEP */}
           <div>
             <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 14 }}>
-              Dados Cadastrais & Fiscais da Empresa
+              Dados Cadastrais & Fiscais da Empresa (com consulta automática Receita / ViaCEP)
             </h3>
-            <div className="form-grid">
-              <div className="field s6">
-                <label>Razão Social *</label>
-                <input name="name" defaultValue={company.name} required />
-              </div>
-              <div className="field s3">
-                <label>Nome Fantasia</label>
-                <input name="tradeName" defaultValue={company.tradeName ?? ""} />
-              </div>
-              <div className="field s3">
-                <label>Meta Mensal de Faturamento (R$)</label>
-                <input
-                  name="monthlyGoal"
-                  type="number"
-                  step="100"
-                  min="0"
-                  defaultValue={company.monthlyGoal ?? 30000}
-                />
-              </div>
-              <div className="field s3">
-                <label>CNPJ</label>
-                <input name="document" defaultValue={company.document ?? ""} />
-              </div>
-              <div className="field s3">
-                <label>Inscrição Estadual</label>
-                <input name="stateRegistration" defaultValue={company.stateRegistration ?? ""} />
-              </div>
-              <div className="field s3">
-                <label>Chave PIX (para QR Code nos Recibos)</label>
-                <input
-                  name="pixKey"
-                  placeholder="CNPJ, CPF, E-mail, Celular ou Chave Aleatória"
-                  defaultValue={company.pixKey ?? company.document ?? ""}
-                />
-              </div>
-              <div className="field s3">
-                <label>Telefone / WhatsApp</label>
-                <input name="phone" defaultValue={company.phone ?? ""} />
-              </div>
-              <div className="field">
-                <label>E-mail comercial</label>
-                <input name="email" type="email" defaultValue={company.email ?? ""} />
-              </div>
-              <div className="field">
-                <label>Site</label>
-                <input name="website" defaultValue={company.website ?? ""} />
-              </div>
-              <div className="field s8">
-                <label>Endereço</label>
-                <input name="address" defaultValue={company.address ?? ""} />
-              </div>
-              <div className="field s4">
-                <label>CEP</label>
-                <input name="zipCode" defaultValue={company.zipCode ?? ""} />
-              </div>
-              <div className="field s8">
-                <label>Cidade</label>
-                <input name="city" defaultValue={company.city ?? ""} />
-              </div>
-              <div className="field s4">
-                <label>UF</label>
-                <select name="state" defaultValue={company.state ?? ""}>
-                  <option value="">—</option>
-                  {UFS.map((uf) => (
-                    <option key={uf}>{uf}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="field s12">
-                <label>Texto de rodapé nos recibos / Ordens de Serviço</label>
-                <textarea name="receiptFooter" defaultValue={company.receiptFooter ?? ""} />
-              </div>
-            </div>
+            <CompanyFiscalLookupFields company={company} />
           </div>
         </ActionForm>
+      </div>
+
+      {/* Seção 4: Segurança, Governança & Backup Completo em 1 Clique */}
+      <div className="card">
+        <div className="card-header" style={{ flexWrap: "wrap" }}>
+          <h2>
+            <Database size={18} /> Segurança, Governança & Backup Completo dos Dados
+          </h2>
+          <span className="badge success">
+            <ShieldCheck size={13} /> Banco PostgreSQL Sincronizado
+          </span>
+        </div>
+
+        <p className="small muted mb">
+          Exporte a qualquer momento uma cópia integral de segurança de todos os módulos do sistema (Cadastros, Vendas,
+          NF-e, Ordens de Serviço, Produção, Estoque, WMS e Financeiro) em formato estruturado <code>.JSON</code> ou em
+          planilhas <code>.CSV / Excel</code>.
+        </p>
+
+        <div className="stats mb">
+          <div className="stat">
+            <div className="label">Clientes Cadastrados</div>
+            <div className="value">{clientsCount}</div>
+          </div>
+          <div className="stat">
+            <div className="label">Produtos & Insumos</div>
+            <div className="value">{productsCount}</div>
+          </div>
+          <div className="stat">
+            <div className="label">Vendas & Orçamentos</div>
+            <div className="value">{salesCount}</div>
+          </div>
+          <div className="stat">
+            <div className="label">Lançamentos Financeiros</div>
+            <div className="value">{finCount}</div>
+          </div>
+        </div>
+
+        <div className="row" style={{ gap: 10, flexWrap: "wrap" }}>
+          <a className="btn" href="/api/backup" download>
+            <Download size={16} /> Baixar Backup Geral do Sistema (.JSON)
+          </a>
+          <a className="btn secondary" href="/api/export?entity=vendas">
+            <FileSpreadsheet size={15} /> Planilha de Vendas (.CSV)
+          </a>
+          <a className="btn secondary" href="/api/export?entity=produtos">
+            <FileSpreadsheet size={15} /> Planilha de Produtos (.CSV)
+          </a>
+          <a className="btn secondary" href="/api/export?entity=clientes">
+            <FileSpreadsheet size={15} /> Planilha de Clientes (.CSV)
+          </a>
+          <a className="btn secondary" href="/api/export?entity=financeiro">
+            <FileSpreadsheet size={15} /> Planilha do Financeiro (.CSV)
+          </a>
+        </div>
       </div>
     </>
   );

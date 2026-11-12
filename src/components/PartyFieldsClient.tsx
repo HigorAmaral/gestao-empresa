@@ -10,10 +10,12 @@ export function PartyFieldsClient({ data }: { data?: PartyLike | null }) {
   const [document, setDocument] = useState(data?.document ?? "");
   const [email, setEmail] = useState(data?.email ?? "");
   const [phone, setPhone] = useState(data?.phone ?? "");
-  const [zipSearch, setZipSearch] = useState("");
+  const [zipSearch, setZipSearch] = useState(data?.zipCode ?? "");
   const [address, setAddress] = useState(data?.address ?? "");
   const [city, setCity] = useState(data?.city ?? "");
   const [state, setState] = useState(data?.state ?? "");
+  const [ie, setIe] = useState(data?.ie ?? "");
+  const [ieIndicator, setIeIndicator] = useState(data?.ieIndicator ?? "9");
   const [notes, setNotes] = useState(data?.notes ?? "");
   const [loadingCnpj, setLoadingCnpj] = useState(false);
   const [loadingCep, setLoadingCep] = useState(false);
@@ -125,11 +127,15 @@ export function PartyFieldsClient({ data }: { data?: PartyLike | null }) {
       </div>
 
       <div className="field s4">
-        <label>Buscar Endereço por CEP</label>
+        <label>CEP (Busca Automática)</label>
         <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
           <input
+            name="zipCode"
             value={zipSearch}
             onChange={(e) => setZipSearch(e.target.value)}
+            onBlur={() => {
+              if (zipSearch.replace(/\D/g, "").length === 8 && !address) lookupCep();
+            }}
             placeholder="00000-000"
             maxLength={9}
             style={{ flex: 1, minWidth: 120 }}
@@ -163,6 +169,25 @@ export function PartyFieldsClient({ data }: { data?: PartyLike | null }) {
           {UFS.map((uf) => (
             <option key={uf}>{uf}</option>
           ))}
+        </select>
+      </div>
+
+      <div className="field s6">
+        <label>Inscrição Estadual (IE — para NF-e)</label>
+        <input
+          name="ie"
+          value={ie}
+          onChange={(e) => setIe(e.target.value)}
+          placeholder="Ex: 110.042.490.114 ou ISENTO"
+        />
+      </div>
+
+      <div className="field s6">
+        <label>Indicador da IE (Fiscal SEFAZ)</label>
+        <select name="ieIndicator" value={ieIndicator} onChange={(e) => setIeIndicator(e.target.value)}>
+          <option value="9">9 — Não Contribuinte (Pessoa Física / Geral)</option>
+          <option value="1">1 — Contribuinte ICMS (Possui IE ativa)</option>
+          <option value="2">2 — Contribuinte Isento de Inscrição</option>
         </select>
       </div>
 

@@ -215,18 +215,23 @@ export async function completeProductionOrder(id: number) {
         }
       }
 
-      // 2. Dá entrada no produto final acabado fabricado
+      // 2. Dá entrada no produto final acabado fabricado (considerando quantidade boa produzida ou desconto de refugo)
+      const goodQty =
+        order.producedQuantity != null && order.producedQuantity > 0
+          ? order.producedQuantity
+          : Math.max(0, order.quantity - (order.scrapQuantity ?? 0));
+
       await tx.product.update({
         where: { id: order.productId },
-        data: { stock: { increment: order.quantity } },
+        data: { stock: { increment: goodQty } },
       });
 
       await tx.stockMovement.create({
         data: {
           productId: order.productId,
           type: "ENTRADA",
-          quantity: order.quantity,
-          reason: `Produção concluída OP ${order.code} - Máquina ${order.machine}`,
+          quantity: goodQty,
+          reason: `Produção concluída OP ${order.code} - Máquina ${order.machine}${order.scrapQuantity ? ` (Refugo: ${order.scrapQuantity})` : ""}`,
           userId: session.userId,
         },
       });
@@ -237,6 +242,7 @@ export async function completeProductionOrder(id: number) {
         data: {
           status: "CONCLUIDA",
           completedAt: new Date(),
+          producedQuantity: goodQty,
         },
       });
     });
@@ -382,4 +388,124 @@ export async function deleteProductionMachine(id: number) {
 
   revalidateAll();
   redirect(`/producao?tab=maquinas&ok=${encodeURIComponent("Máquina removida com sucesso!")}`);
+}
+
+export async function saveProductionMetricsAction(id: number, fd: FormData) {
+  const session = await requireUser();
+  await ensureStockLocationTables();
+
+  const producedQuantity = Number(fd.get("producedQuantity") ?? 0);
+  const scrapQuantity = Math.max(0, Number(fd.get("scrapQuantity") ?? 0));
+  const actualMinutesRaw = fd.get("actualMinutes");
+  const actualMinutes = actualMinutesRaw !== null && String(actualMinutesRaw).trim() !== "" ? Math.max(0, Math.round(Number(actualMinutesRaw))) : null;
+  const scrapReason = str(fd, "scrapReason");
+
+  await prisma.productionOrder.update({
+    where: { id },
+    data: {
+      producedQuantity: producedQuantity > 0 ? producedQuantity : null,
+      scrapQuantity,
+      actualMinutes,
+      scrapReason: scrapReason || null,
+    },
+  });
+
+  await logAudit(
+    session,
+    "PRODUCAO",
+    "APONTAMENTO",
+    `Registrou apontamento na OP #${id}: Produzido=${producedQuantity}, Refugo=${scrapQuantity}, Tempo=${actualMinutes ?? 0} min`,
+    id,
+  );
+
+  revalidateAll();
+  redirect(`/producao/${id}?ok=${encodeURIComponent("Apontamento de produção, refugo e tempo salvo com sucesso!")}`);
+}
+
+/** Calcula as matérias-primas faltantes para todas as OPs ativas (MRP) e gera um Pedido de Compra automático. */
+export async function generateMrpPurchaseOrderAction() {
+  const session = await requireUser();
+  await ensureStockLocationTables();
+
+  const activeOrders = await prisma.productionOrder.findMany({
+    where: { status: { in: ["PLANEJADA", "EM_PRODUCAO"] } },
+    include: {
+      items: { include: { product: true } },
+    },
+  });
+
+  const reqByProduct = new Map<
+    number,
+    { productId: number; name: string; stock: number; costPrice: number; supplierId: number | null; totalRequired: number }
+  >();
+
+  for (const op of activeOrders) {
+    for (const item of op.items) {
+      const existing = reqByProduct.get(item.productId) ?? {
+        productId: item.productId,
+        name: item.product.name,
+        stock: item.product.stock,
+        costPrice: item.product.costPrice > 0 ? item.product.costPrice : Number((item.product.salePrice * 0.6).toFixed(2)) || 10,
+        supplierId: item.product.supplierId,
+        totalRequired: 0,
+      };
+      existing.totalRequired += item.quantityRequired;
+      reqByProduct.set(item.productId, existing);
+    }
+  }
+
+  const shortages = [...reqByProduct.values()]
+    .map((r) => ({ ...r, missing: Number(Math.max(0, r.totalRequired - r.stock).toFixed(4)) }))
+    .filter((r) => r.missing > 0);
+
+  if (shortages.length === 0) {
+    redirect(`/producao?tab=mrp&ok=${encodeURIComponent("Estoque suficiente para todas as OPs ativas! Nenhum insumo em falta.")}`);
+  }
+
+  let createdPurchaseId = 0;
+
+  await prisma.$transaction(async (tx) => {
+    const preferredSupplierId = shortages.find((s) => s.supplierId)?.supplierId ?? (await tx.supplier.findFirst())?.id ?? null;
+    const total = Number(shortages.reduce((acc, s) => acc + s.missing * s.costPrice, 0).toFixed(2));
+    const due = new Date(Date.now() + 15 * 86400000);
+
+    const purchase = await tx.purchase.create({
+      data: {
+        supplierId: preferredSupplierId,
+        userId: session.userId,
+        date: new Date(),
+        dueDate: due,
+        status: "PENDENTE",
+        total,
+        notes: `Gerado automaticamente pelo MRP para suprir ${activeOrders.length} Ordem(ns) de Produção ativa(s).`,
+        items: {
+          create: shortages.map((s) => ({
+            productId: s.productId,
+            quantity: s.missing,
+            unitCost: s.costPrice,
+            total: Number((s.missing * s.costPrice).toFixed(2)),
+          })),
+        },
+      },
+    });
+    createdPurchaseId = purchase.id;
+
+    await tx.financialEntry.create({
+      data: {
+        type: "DESPESA",
+        description: `Compra MRP #${purchase.id} (Insumos p/ Produção)`,
+        category: "Compras (MRP)",
+        amount: total,
+        dueDate: due,
+        status: "PENDENTE",
+        purchaseId: purchase.id,
+      },
+    });
+  });
+
+  await logAudit(session, "COMPRAS", "CRIAR", `Gerou Pedido de Compra #${createdPurchaseId} automaticamente via MRP (${shortages.length} insumos faltantes).`, createdPurchaseId);
+  revalidatePath("/compras");
+  revalidatePath("/producao");
+  revalidatePath("/financeiro");
+  redirect(`/compras/${createdPurchaseId}?ok=${encodeURIComponent(`Pedido de Compra #${createdPurchaseId} gerado automaticamente pelo MRP com ${shortages.length} insumo(s) faltante(s)!`)}`);
 }

@@ -1,23 +1,28 @@
 import Link from "next/link";
 import type { Prisma } from "@prisma/client";
-import { MessageCircle, Plus } from "lucide-react";
+import { Building2, CalendarRange, MessageCircle, Plus } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
 import { pageParams, spStr } from "@/lib/form";
 import { brl, fmtDate, todayUTC } from "@/lib/format";
+import { ensureStockLocationTables } from "@/lib/stock-location";
 import { buildWhatsAppUrl, financialWhatsAppMessage } from "@/lib/whatsapp";
 import { ExportCsvButton, FlashMessages, PageHeader, Pagination, StatusBadge } from "@/components/ui";
 import { ConfirmButton } from "@/components/Forms";
+import { FinanceToolsModals } from "@/components/FinanceToolsModals";
 import { deleteEntry, markPaid } from "./actions";
 
 type SP = Promise<Record<string, string | string[] | undefined>>;
 
 export default async function FinanceiroPage({ searchParams }: { searchParams: SP }) {
   await requireAdmin();
+  await ensureStockLocationTables();
   const sp = await searchParams;
   const type = spStr(sp, "type");
   const status = spStr(sp, "status");
   const month = spStr(sp, "month");
+  const bankIdStr = spStr(sp, "bankAccountId");
+  const bankAccountId = bankIdStr ? Number(bankIdStr) : undefined;
   const q = spStr(sp, "q");
   const { page, skip, take, pageSize } = pageParams(sp);
   const today = todayUTC();
@@ -30,21 +35,41 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: S
 
   const where: Prisma.FinancialEntryWhereInput = {
     ...(type && { type }),
+    ...(bankAccountId && { bankAccountId }),
     ...(status === "VENCIDO" ? { status: "PENDENTE", dueDate: { lt: today, ...dueFilter } } : status ? { status } : {}),
     ...(status !== "VENCIDO" && dueFilter && { dueDate: dueFilter }),
     ...(q && { OR: [{ description: { contains: q } }, { category: { contains: q } }] }),
   };
 
   const sumWhere = (extra: Prisma.FinancialEntryWhereInput) =>
-    prisma.financialEntry.aggregate({ where: { ...extra, ...(dueFilter && { dueDate: dueFilter }) }, _sum: { amount: true } });
+    prisma.financialEntry.aggregate({
+      where: { ...extra, ...(dueFilter && { dueDate: dueFilter }), ...(bankAccountId && { bankAccountId }) },
+      _sum: { amount: true },
+    });
 
-  const [entries, total, recPaid, desPaid, recOpen, desOpen, overdue] = await Promise.all([
+  const d30 = new Date(today.getTime() + 30 * 86400000);
+  const d60 = new Date(today.getTime() + 60 * 86400000);
+  const d90 = new Date(today.getTime() + 90 * 86400000);
+
+  const [
+    entries,
+    total,
+    recPaid,
+    desPaid,
+    recOpen,
+    desOpen,
+    overdue,
+    bankAccounts,
+    paidEntriesByBank,
+    pendingNext90,
+  ] = await Promise.all([
     prisma.financialEntry.findMany({
       where,
       orderBy: [{ dueDate: "asc" }, { id: "asc" }],
       skip,
       take,
       include: {
+        bankAccount: true,
         sale: { select: { client: { select: { name: true, phone: true } } } },
         serviceOrder: { select: { client: { select: { name: true, phone: true } } } },
       },
@@ -55,9 +80,50 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: S
     sumWhere({ type: "RECEITA", status: "PENDENTE" }),
     sumWhere({ type: "DESPESA", status: "PENDENTE" }),
     prisma.financialEntry.aggregate({ where: { status: "PENDENTE", dueDate: { lt: today } }, _sum: { amount: true }, _count: true }),
+    prisma.bankAccount.findMany({ where: { active: true }, orderBy: { id: "asc" } }),
+    prisma.financialEntry.groupBy({
+      by: ["bankAccountId", "type"],
+      where: { status: "PAGO", bankAccountId: { not: null } },
+      _sum: { amount: true },
+    }),
+    prisma.financialEntry.findMany({
+      where: { status: "PENDENTE", dueDate: { lte: d90 } },
+      select: { type: true, amount: true, dueDate: true },
+    }),
   ]);
 
   const balance = (recPaid._sum.amount ?? 0) - (desPaid._sum.amount ?? 0);
+
+  // Calcula saldo atual de cada conta bancária
+  const bankAccountsSummary = bankAccounts.map((acc) => {
+    const rec =
+      paidEntriesByBank.find((g) => g.bankAccountId === acc.id && g.type === "RECEITA")?._sum.amount ?? 0;
+    const des =
+      paidEntriesByBank.find((g) => g.bankAccountId === acc.id && g.type === "DESPESA")?._sum.amount ?? 0;
+    return {
+      ...acc,
+      currentBalance: acc.initialBalance + rec - des,
+    };
+  });
+
+  const totalBankBalance = bankAccountsSummary.reduce((s, a) => s + a.currentBalance, 0);
+
+  // Projeção de Fluxo de Caixa para 30, 60 e 90 dias
+  const calcWindow = (limit: Date) => {
+    let rec = 0;
+    let des = 0;
+    for (const p of pendingNext90) {
+      if (p.dueDate <= limit) {
+        if (p.type === "RECEITA") rec += p.amount;
+        else des += p.amount;
+      }
+    }
+    return { rec, des, projected: totalBankBalance + rec - des };
+  };
+  const proj30 = calcWindow(d30);
+  const proj60 = calcWindow(d60);
+  const proj90 = calcWindow(d90);
+
   const qs = new URLSearchParams(
     Object.entries(sp).filter(([k, v]) => typeof v === "string" && v && k !== "ok" && k !== "erro") as [string, string][],
   ).toString();
@@ -66,10 +132,11 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: S
   return (
     <>
       <PageHeader
-        title="Financeiro"
-        subtitle="Contas a pagar, contas a receber e fluxo de caixa"
+        title="Financeiro & Conciliação"
+        subtitle="Contas a pagar e receber, saldos bancários, conciliação OFX e fluxo de caixa projetado"
         actions={
           <>
+            <FinanceToolsModals accounts={bankAccountsSummary} />
             <ExportCsvButton entity="financeiro" />
             <Link className="btn" href="/financeiro/novo?type=RECEITA">
               <Plus size={15} /> Receita
@@ -112,6 +179,86 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: S
         </div>
       </div>
 
+      {/* Contas Bancárias & Fluxo de Caixa Projetado (30 / 60 / 90 dias) */}
+      <div className="grid grid-2 mb">
+        <div className="card">
+          <div className="card-header">
+            <h2>
+              <Building2 size={16} /> Saldos em Contas & Carteiras ({brl(totalBankBalance)})
+            </h2>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {bankAccountsSummary.map((acc) => (
+              <div
+                key={acc.id}
+                className="row between"
+                style={{
+                  padding: "8px 12px",
+                  borderRadius: 8,
+                  background: "var(--surface-subtle)",
+                  border: "1px solid var(--border)",
+                }}
+              >
+                <div>
+                  <Link href={`/financeiro?bankAccountId=${acc.id}`} className="bold" style={{ fontSize: 13.5 }}>
+                    {acc.name}
+                  </Link>
+                  <div className="small muted">
+                    {acc.bankName || acc.type} {acc.accountNumber ? `• C/C ${acc.accountNumber}` : ""}
+                  </div>
+                </div>
+                <div className="bold" style={{ fontSize: 14.5 }}>
+                  {brl(acc.currentBalance)}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="card-header">
+            <h2>
+              <CalendarRange size={16} /> Fluxo de Caixa Projetado (30 / 60 / 90 dias)
+            </h2>
+            <Link href="/relatorios" className="small">
+              Ver DRE Completo →
+            </Link>
+          </div>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Horizonte</th>
+                  <th className="num">(+) A Receber</th>
+                  <th className="num">(-) A Pagar</th>
+                  <th className="num">Saldo Projetado</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td className="bold">Próximos 30 dias</td>
+                  <td className="num text-success">{brl(proj30.rec)}</td>
+                  <td className="num text-danger">-{brl(proj30.des)}</td>
+                  <td className="num bold">{brl(proj30.projected)}</td>
+                </tr>
+                <tr>
+                  <td className="bold">Próximos 60 dias</td>
+                  <td className="num text-success">{brl(proj60.rec)}</td>
+                  <td className="num text-danger">-{brl(proj60.des)}</td>
+                  <td className="num bold">{brl(proj60.projected)}</td>
+                </tr>
+                <tr>
+                  <td className="bold">Próximos 90 dias</td>
+                  <td className="num text-success">{brl(proj90.rec)}</td>
+                  <td className="num text-danger">-{brl(proj90.des)}</td>
+                  <td className="num bold">{brl(proj90.projected)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
       <form className="filters">
         <input className="grow" name="q" placeholder="Buscar descrição ou categoria..." defaultValue={q} />
         <select name="type" defaultValue={type}>
@@ -125,6 +272,14 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: S
           <option value="VENCIDO">Vencido</option>
           <option value="PAGO">Pago</option>
           <option value="CANCELADO">Cancelado</option>
+        </select>
+        <select name="bankAccountId" defaultValue={bankIdStr}>
+          <option value="">Todas as contas</option>
+          {bankAccountsSummary.map((acc) => (
+            <option key={acc.id} value={acc.id}>
+              {acc.name}
+            </option>
+          ))}
         </select>
         <input type="month" name="month" defaultValue={month} title="Mês de vencimento" />
         <button className="btn secondary">Filtrar</button>
@@ -140,7 +295,7 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: S
               <tr>
                 <th>Vencimento</th>
                 <th>Descrição</th>
-                <th>Categoria</th>
+                <th>Categoria / Conta</th>
                 <th>Tipo</th>
                 <th>Status</th>
                 <th>Pago em</th>
@@ -172,7 +327,10 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: S
                         </div>
                       )}
                     </td>
-                    <td>{e.category ?? "—"}</td>
+                    <td>
+                      <div>{e.category ?? "—"}</div>
+                      {e.bankAccount && <div className="small muted">{e.bankAccount.name}</div>}
+                    </td>
                     <td>
                       <StatusBadge status={e.type} />
                     </td>

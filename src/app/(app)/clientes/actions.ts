@@ -5,12 +5,14 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 import { toFormError, type FormState } from "@/lib/form";
-import { partyData } from "@/components/PartyFields";
+import { ensureStockLocationTables } from "@/lib/stock-location";
+import { clientPartyData } from "@/components/PartyFields";
 
 export async function saveClient(id: number | null, _prev: FormState, fd: FormData): Promise<FormState> {
   await requireUser();
+  await ensureStockLocationTables();
   try {
-    const data = partyData(fd);
+    const data = clientPartyData(fd);
     if (id) await prisma.client.update({ where: { id }, data });
     else await prisma.client.create({ data });
   } catch (e) {

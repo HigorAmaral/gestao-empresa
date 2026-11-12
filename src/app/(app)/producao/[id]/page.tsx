@@ -26,6 +26,7 @@ import { ProductionPickingChecklist } from "./ProductionPickingChecklist";
 import {
   cancelProductionOrder,
   completeProductionOrder,
+  saveProductionMetricsAction,
   startProductionOrder,
 } from "../actions";
 
@@ -223,6 +224,68 @@ export default async function ProductionOrderDetailPage({
             )}
           </div>
         </div>
+      </div>
+
+      {/* Apontamento de Chão de Fábrica: Produção Real, Controle de Refugo/Perda e Tempo de Máquina */}
+      <div className="card mb">
+        <div className="card-header" style={{ flexWrap: "wrap" }}>
+          <h2>
+            <Wrench size={17} /> Apontamento de Produção, Controle de Refugo (Perda) e Tempo de Máquina
+          </h2>
+          {order.scrapQuantity > 0 && (
+            <span className="badge danger">
+              Taxa de Refugo: {num((order.scrapQuantity / Math.max(1, order.quantity)) * 100, 1)}% ({num(order.scrapQuantity)}{" "}
+              {order.product.unit})
+            </span>
+          )}
+        </div>
+        <form action={saveProductionMetricsAction.bind(null, order.id)}>
+          <div className="form-grid">
+            <div className="field s3">
+              <label>Qtd Boa Produzida ({order.product.unit})</label>
+              <input
+                name="producedQuantity"
+                type="number"
+                step="0.01"
+                min="0"
+                defaultValue={order.producedQuantity ?? order.quantity}
+              />
+            </div>
+            <div className="field s3">
+              <label>Qtd Refugo / Perda ({order.product.unit})</label>
+              <input
+                name="scrapQuantity"
+                type="number"
+                step="0.01"
+                min="0"
+                defaultValue={order.scrapQuantity ?? 0}
+              />
+            </div>
+            <div className="field s3">
+              <label>Tempo de Máquina (Minutos)</label>
+              <input
+                name="actualMinutes"
+                type="number"
+                min="0"
+                placeholder="Ex: 90"
+                defaultValue={order.actualMinutes ?? ""}
+              />
+            </div>
+            <div className="field s3" style={{ display: "flex", alignItems: "flex-end" }}>
+              <button type="submit" className="btn secondary" style={{ width: "100%", justifyContent: "center" }}>
+                Salvar Apontamento
+              </button>
+            </div>
+            <div className="field s12">
+              <label>Motivo de Refugo / Observação de Qualidade</label>
+              <input
+                name="scrapReason"
+                defaultValue={order.scrapReason ?? ""}
+                placeholder="Opcional: descreva o motivo caso tenha ocorrido perda de material ou parada de máquina..."
+              />
+            </div>
+          </div>
+        </form>
       </div>
 
       {/* Lista de Insumos & Separação no Estoque (BOM) Interativa com Bipagem */}

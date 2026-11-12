@@ -4,9 +4,11 @@ import { Download, FileCheck, FileText, MessageCircle, Printer } from "lucide-re
 import { prisma } from "@/lib/prisma";
 import { brl, fmtDate, fmtDateTime, PAYMENT_METHODS, toInputDate, todayInput } from "@/lib/format";
 import { buildWhatsAppUrl, saleWhatsAppMessage } from "@/lib/whatsapp";
+import { makePublicToken } from "@/lib/public-token";
 import { FlashMessages, PageHeader, StatusBadge } from "@/components/ui";
 import { ActionForm, ConfirmButton } from "@/components/Forms";
 import { ItemsEditor } from "@/components/ItemsEditor";
+import { PublicApprovalShare } from "@/components/PublicApprovalShare";
 import { cancelSale, confirmSale, deleteSale, duplicateSale, saveSale } from "../actions";
 import { emitNfeFromSale } from "@/app/(app)/nfe/actions";
 
@@ -94,6 +96,12 @@ export default async function VendaPage({
           sale && (
             <>
               <StatusBadge status={sale.status} />
+              <PublicApprovalShare
+                relativePath={`/p/venda/${sale.id}?t=${makePublicToken("venda", sale.id)}`}
+                clientPhone={sale.client?.phone}
+                whatsappMessagePrefix={`Olá${sale.client?.name ? ` ${sale.client.name}` : ""}! Segue a proposta/orçamento #${sale.id} no valor de ${brl(sale.total)}.`}
+                label="Link de Aprovação"
+              />
               {waUrl && (
                 <a className="btn secondary" href={waUrl} target="_blank" rel="noopener noreferrer">
                   <MessageCircle size={15} /> WhatsApp

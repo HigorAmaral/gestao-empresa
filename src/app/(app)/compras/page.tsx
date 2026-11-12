@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { pageParams, spStr } from "@/lib/form";
 import { brl, fmtDate } from "@/lib/format";
 import { ExportCsvButton, FlashMessages, PageHeader, Pagination, StatusBadge } from "@/components/ui";
+import { XmlImportModal } from "@/components/XmlImportModal";
 
 type SP = Promise<Record<string, string | string[] | undefined>>;
 
@@ -39,6 +40,7 @@ export default async function ComprasPage({ searchParams }: { searchParams: SP }
         subtitle="Pedidos de compra a fornecedores"
         actions={
           <>
+            <XmlImportModal />
             <ExportCsvButton entity="compras" />
             <Link className="btn" href="/compras/novo">
               <Plus size={15} /> Nova compra

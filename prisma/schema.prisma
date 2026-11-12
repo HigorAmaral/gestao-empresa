@@ -187,6 +187,8 @@ model Sale {
   discount      Float    @default(0)
   total         Float    @default(0)
   notes         String?
+  approvedAt    DateTime?
+  clientNotes   String?
   createdAt     DateTime @default(now())
 
   items     SaleItem[]
@@ -258,6 +260,8 @@ model ServiceOrder {
   discount       Float     @default(0)
   total          Float     @default(0)
   notes          String?
+  approvedAt     DateTime?
+  clientNotes    String?
   createdAt      DateTime  @default(now())
 
   items     ServiceOrderItem[]
@@ -287,23 +291,62 @@ model StockMovement {
   createdAt DateTime @default(now())
 }
 
-model FinancialEntry {
-  id             Int           @id @default(autoincrement())
-  type           String // RECEITA | DESPESA
-  description    String
-  category       String?
-  amount         Float
-  dueDate        DateTime
-  paidAt         DateTime?
-  status         String        @default("PENDENTE") // PENDENTE | PAGO | CANCELADO
+model BankAccount {
+  id             Int              @id @default(autoincrement())
+  name           String           // Ex: "Caixa Físico", "Banco Itaú", "Nubank PJ"
+  bankName       String?          // Ex: "341 - Itaú Unibanco", "260 - Nu Pagamentos"
+  agency         String?
+  accountNumber  String?
+  type           String           @default("CORRENTE") // CAIXA | CORRENTE | DIGITAL | INVESTIMENTO
+  initialBalance Float            @default(0)
+  active         Boolean          @default(true)
+  createdAt      DateTime         @default(now())
+
+  entries        FinancialEntry[]
+}
+
+model CashSession {
+  id             Int       @id @default(autoincrement())
+  userId         Int?
+  userName       String
+  status         String    @default("ABERTO") // ABERTO | FECHADO
+  openedAt       DateTime  @default(now())
+  closedAt       DateTime?
+  openingBalance Float     @default(0)
+  closingBalance Float?
+  totalCash      Float     @default(0)
+  totalPix       Float     @default(0)
+  totalCard      Float     @default(0)
+  totalOther     Float     @default(0)
+  withdrawals    Float     @default(0)
+  supplies       Float     @default(0)
+  salesCount     Int       @default(0)
   notes          String?
-  saleId         Int?
-  sale           Sale?         @relation(fields: [saleId], references: [id], onDelete: SetNull)
-  purchaseId     Int?
-  purchase       Purchase?     @relation(fields: [purchaseId], references: [id], onDelete: SetNull)
-  serviceOrderId Int?
-  serviceOrder   ServiceOrder? @relation(fields: [serviceOrderId], references: [id], onDelete: SetNull)
-  createdAt      DateTime      @default(now())
+}
+
+model FinancialEntry {
+  id                Int           @id @default(autoincrement())
+  type              String // RECEITA | DESPESA
+  description       String
+  category          String?
+  amount            Float
+  dueDate           DateTime
+  paidAt            DateTime?
+  status            String        @default("PENDENTE") // PENDENTE | PAGO | CANCELADO
+  notes             String?
+  bankAccountId     Int?
+  bankAccount       BankAccount?  @relation(fields: [bankAccountId], references: [id], onDelete: SetNull)
+  installmentNumber Int?
+  installmentTotal  Int?
+  recurrenceGroup   String?
+  ofxFitId          String?
+  saleId            Int?
+  sale              Sale?         @relation(fields: [saleId], references: [id], onDelete: SetNull)
+  purchaseId        Int?
+  purchase          Purchase?     @relation(fields: [purchaseId], references: [id], onDelete: SetNull)
+  serviceOrderId    Int?
+  serviceOrder      ServiceOrder? @relation(fields: [serviceOrderId], references: [id], onDelete: SetNull)
+  createdAt         DateTime      @default(now())
 }
 
 // ---------- Endereçamento de Estoque / Localização de Produtos ----------
@@ -384,10 +427,14 @@ model ProductionOrder {
   operatorName String?               // Operador responsável pela máquina
   priority     String                @default("NORMAL") // BAIXA | NORMAL | ALTA | URGENTE
   status       String                @default("PLANEJADA") // PLANEJADA | EM_PRODUCAO | CONCLUIDA | CANCELADA
-  startDate    DateTime?             // Início da produção
-  deliveryDate DateTime?             // Previsão de entrega dos materiais na máquina
-  completedAt  DateTime?             // Conclusão da produção
-  notes        String?               // Instruções técnicas / operacionais
+  startDate        DateTime?             // Início da produção
+  deliveryDate     DateTime?             // Previsão de entrega dos materiais na máquina
+  completedAt      DateTime?             // Conclusão da produção
+  producedQuantity Float?                // Quantidade boa efetivamente produzida
+  scrapQuantity    Float                 @default(0) // Quantidade descartada (refugo / perda)
+  actualMinutes    Int?                  // Tempo gasto na máquina (em minutos)
+  scrapReason      String?               // Motivo de refugo / perda
+  notes            String?               // Instruções técnicas / operacionais
   userId       Int?
   user         User?                 @relation(fields: [userId], references: [id], onDelete: SetNull)
   createdAt    DateTime              @default(now())

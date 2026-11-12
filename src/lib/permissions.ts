@@ -200,6 +200,15 @@ export function canAccessPath(
   if (pathname === "/" || pathname === "/login" || pathname.startsWith("/perfil") || pathname.startsWith("/api")) {
     return true;
   }
+  if (pathname === "/pdv" || pathname.startsWith("/pdv/") || pathname === "/nfe" || pathname.startsWith("/nfe/")) {
+    return hasModuleAccess(session, "vendas");
+  }
+  if (pathname === "/producao" || pathname.startsWith("/producao/")) {
+    return hasModuleAccess(session, "os");
+  }
+  if (pathname === "/recebimento" || pathname.startsWith("/recebimento/")) {
+    return hasModuleAccess(session, "estoque");
+  }
   const matched = APP_MODULES.find((m) => pathname === m.href || pathname.startsWith(m.href + "/"));
   if (!matched) return true;
   return hasModuleAccess(session, matched.key);

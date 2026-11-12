@@ -4,8 +4,11 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
+import { logAudit } from "@/lib/audit";
 import { dateVal, intOrNull, str, toFormError, ValidationError, type FormState } from "@/lib/form";
 import { parseItems, round2 } from "@/lib/items";
+import { parseNfeXml } from "@/lib/nfe/xml-import";
+import { ensureStockLocationTables } from "@/lib/stock-location";
 
 function back(id: number, key: "ok" | "erro", msg: string): never {
   redirect(`/compras/${id}?${key}=${encodeURIComponent(msg)}`);
@@ -143,4 +146,214 @@ export async function deletePurchase(id: number) {
   ]);
   revalidateAll();
   redirect("/compras?ok=" + encodeURIComponent(`Compra #${id} excluída.`));
+}
+
+/** Importa um XML de NF-e de Fornecedor: cadastra fornecedor, produtos, compra, estoque e parcelas financeiras. */
+export async function importPurchaseXml(fd: FormData): Promise<{ error?: string }> {
+  const session = await requireUser();
+  await ensureStockLocationTables();
+  let createdPurchaseId = 0;
+  let summaryMsg = "";
+
+  try {
+    const xmlContent = str(fd, "xmlContent");
+    if (!xmlContent) throw new ValidationError("Envie ou cole o conteúdo XML da NF-e.");
+    const receiveImmediately = fd.get("receiveImmediately") === "true" || fd.get("receiveImmediately") === "on";
+    const markupPercent = Number(fd.get("markupPercent") ?? 45) || 45;
+
+    const parsed = parseNfeXml(xmlContent);
+    const issueDate = new Date(parsed.issueDate + "T12:00:00Z");
+    const firstDue = parsed.duplicates[0]?.dueDate
+      ? new Date(parsed.duplicates[0].dueDate + "T12:00:00Z")
+      : issueDate;
+
+    await prisma.$transaction(async (tx) => {
+      // 1. Localiza ou cadastra Fornecedor
+      const cleanCnpj = parsed.supplier.cnpj.replace(/\D/g, "");
+      let supplier = cleanCnpj
+        ? await tx.supplier.findFirst({
+            where: {
+              OR: [
+                { document: parsed.supplier.cnpj },
+                { document: cleanCnpj },
+              ],
+            },
+          })
+        : null;
+
+      if (!supplier) {
+        supplier = await tx.supplier.findFirst({
+          where: { name: { equals: parsed.supplier.name } },
+        });
+      }
+
+      if (!supplier) {
+        supplier = await tx.supplier.create({
+          data: {
+            name: parsed.supplier.tradeName || parsed.supplier.name,
+            document: parsed.supplier.cnpj || null,
+            phone: parsed.supplier.phone || null,
+            email: parsed.supplier.email || null,
+            address: parsed.supplier.address || null,
+            city: parsed.supplier.city || null,
+            state: parsed.supplier.state || null,
+            notes: `Cadastrado automaticamente via XML NF-e #${parsed.number}`,
+          },
+        });
+      }
+
+      // 2. Localiza ou cadastra cada Produto da NF-e
+      const purchaseItemRows: { productId: number; quantity: number; unitCost: number; total: number }[] = [];
+      let newProductsCount = 0;
+
+      for (const item of parsed.items) {
+        let product = await tx.product.findFirst({
+          where: {
+            OR: [
+              { sku: item.code },
+              { name: item.name },
+            ],
+          },
+        });
+
+        if (!product) {
+          const suggestedSalePrice = round2(item.unitCost * (1 + markupPercent / 100));
+          const uniqueSku = (await tx.product.findUnique({ where: { sku: item.code } }))
+            ? `${item.code}-${Date.now().toString().slice(-4)}`
+            : item.code;
+
+          product = await tx.product.create({
+            data: {
+              sku: uniqueSku,
+              name: item.name,
+              category: "Importado NF-e",
+              unit: item.unit || "UN",
+              costPrice: item.unitCost,
+              salePrice: suggestedSalePrice,
+              stock: receiveImmediately ? item.quantity : 0,
+              minStock: 2,
+              ncm: item.ncm || "00000000",
+              cest: item.cest || null,
+              cfop: "5102",
+              supplierId: supplier.id,
+            },
+          });
+          newProductsCount++;
+        } else {
+          await tx.product.update({
+            where: { id: product.id },
+            data: {
+              costPrice: item.unitCost,
+              ncm: item.ncm || product.ncm,
+              ...(receiveImmediately ? { stock: { increment: item.quantity } } : {}),
+            },
+          });
+        }
+
+        if (receiveImmediately) {
+          await tx.stockMovement.create({
+            data: {
+              productId: product.id,
+              type: "ENTRADA",
+              quantity: item.quantity,
+              reason: `Importação XML NF-e #${parsed.number} (${supplier.name})`,
+              userId: session.userId,
+            },
+          });
+        }
+
+        purchaseItemRows.push({
+          productId: product.id,
+          quantity: item.quantity,
+          unitCost: item.unitCost,
+          total: item.total,
+        });
+      }
+
+      // 3. Cria o Pedido de Compra
+      const purchase = await tx.purchase.create({
+        data: {
+          supplierId: supplier.id,
+          userId: session.userId,
+          date: issueDate,
+          dueDate: firstDue,
+          receivedAt: receiveImmediately ? new Date() : null,
+          status: receiveImmediately ? "RECEBIDA" : "PENDENTE",
+          total: parsed.totalInvoice,
+          notes: `Importado via XML NF-e Nº ${parsed.number} (Série ${parsed.series})${parsed.accessKey ? ` — Chave: ${parsed.accessKey}` : ""}`,
+          items: { create: purchaseItemRows },
+        },
+      });
+      createdPurchaseId = purchase.id;
+
+      // 4. Se recebido imediatamente, registra também no módulo de Recebimento (GoodsReceipt)
+      if (receiveImmediately) {
+        const receiptCode = `REC-NFE-${parsed.number}-${Date.now().toString().slice(-3)}`;
+        await tx.goodsReceipt.create({
+          data: {
+            code: receiptCode,
+            invoiceNumber: parsed.number,
+            supplierId: supplier.id,
+            purchaseId: purchase.id,
+            status: "RECEBIDO",
+            userId: session.userId,
+            notes: `Recebimento automático via importação de XML NF-e #${parsed.number}`,
+            items: {
+              create: purchaseItemRows.map((pi) => ({
+                productId: pi.productId,
+                quantity: pi.quantity,
+                unitCost: pi.unitCost,
+              })),
+            },
+          },
+        });
+      }
+
+      // 5. Gera as Duplicatas / Parcelas no Contas a Pagar
+      const recGroup = `NFE-${parsed.number}-${purchase.id}`;
+      if (parsed.duplicates.length > 0) {
+        const totalDups = parsed.duplicates.length;
+        for (let i = 0; i < totalDups; i++) {
+          const dup = parsed.duplicates[i];
+          await tx.financialEntry.create({
+            data: {
+              type: "DESPESA",
+              description: `NF-e #${parsed.number} (${i + 1}/${totalDups}) — ${supplier.name}`,
+              category: "Compras (NF-e)",
+              amount: dup.amount,
+              dueDate: new Date(dup.dueDate + "T12:00:00Z"),
+              status: "PENDENTE",
+              purchaseId: purchase.id,
+              installmentNumber: i + 1,
+              installmentTotal: totalDups,
+              recurrenceGroup: recGroup,
+            },
+          });
+        }
+      } else {
+        await tx.financialEntry.create({
+          data: {
+            type: "DESPESA",
+            description: `NF-e #${parsed.number} — ${supplier.name}`,
+            category: "Compras (NF-e)",
+            amount: parsed.totalInvoice,
+            dueDate: firstDue,
+            status: "PENDENTE",
+            purchaseId: purchase.id,
+          },
+        });
+      }
+
+      summaryMsg = `NF-e #${parsed.number} de "${supplier.name}" importada! ${parsed.items.length} item(ns) processado(s) (${newProductsCount} novo(s) cadastrado(s))${receiveImmediately ? ", estoque alimentado" : ""} e financeiro lançado.`;
+    });
+
+    await logAudit(session, "COMPRAS", "CRIAR", summaryMsg, createdPurchaseId);
+  } catch (e) {
+    return toFormError(e) ?? { error: "Falha ao importar XML." };
+  }
+
+  for (const p of ["/compras", "/recebimento", "/produtos", "/estoque", "/financeiro", "/fornecedores", "/"]) {
+    revalidatePath(p);
+  }
+  redirect(`/compras/${createdPurchaseId}?ok=${encodeURIComponent(summaryMsg)}`);
 }

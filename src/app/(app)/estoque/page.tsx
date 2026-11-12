@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Prisma } from "@prisma/client";
-import { AlertTriangle, CheckCircle2, Layers, MapPin } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ClipboardCheck, Layers, MapPin } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { pageParams, spStr } from "@/lib/form";
 import { brl, fmtDateTime, num } from "@/lib/format";
@@ -37,7 +37,12 @@ export default async function EstoquePage({ searchParams }: { searchParams: SP }
     <>
       <PageHeader
         title="Estoque"
-        subtitle="Saldos, movimentações e inventário"
+        subtitle="Saldos, movimentações, endereçamento WMS e balanço de inventário"
+        actions={
+          <Link className="btn" href="/estoque/inventario">
+            <ClipboardCheck size={15} /> Inventário / Contagem Cega
+          </Link>
+        }
       />
 
       <div className="subnav-tabs">
@@ -46,6 +51,9 @@ export default async function EstoquePage({ searchParams }: { searchParams: SP }
         </Link>
         <Link className="subnav-tab" href="/estoque/enderecamento">
           <MapPin size={14} /> Endereçamento & Localização
+        </Link>
+        <Link className="subnav-tab" href="/estoque/inventario">
+          <ClipboardCheck size={14} /> Inventário & Balanço Físico
         </Link>
       </div>
 

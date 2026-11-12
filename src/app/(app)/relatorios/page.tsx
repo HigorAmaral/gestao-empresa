@@ -20,7 +20,7 @@ export default async function RelatoriosPage({ searchParams }: { searchParams: S
     lte: new Date(to + "T23:59:59.999Z"),
   };
 
-  const [sales, saleItems, entries, purchases] = await Promise.all([
+  const [sales, saleItems, serviceOrders, invoices, entries, purchases] = await Promise.all([
     prisma.sale.findMany({
       where: { status: "CONFIRMADA", date: dateRange },
       include: { client: true, user: true },
@@ -28,6 +28,14 @@ export default async function RelatoriosPage({ searchParams }: { searchParams: S
     prisma.saleItem.findMany({
       where: { sale: { status: "CONFIRMADA", date: dateRange } },
       include: { product: true },
+    }),
+    prisma.serviceOrder.findMany({
+      where: { status: "CONCLUIDA", completedAt: dateRange },
+      include: { items: { include: { product: true } } },
+    }),
+    prisma.invoice.aggregate({
+      where: { status: "AUTORIZADA", createdAt: dateRange },
+      _sum: { approxTaxTotal: true, valueIcms: true, valuePis: true, valueCofins: true },
     }),
     prisma.financialEntry.findMany({
       where: { status: "PAGO", dueDate: dateRange },
@@ -39,11 +47,23 @@ export default async function RelatoriosPage({ searchParams }: { searchParams: S
     }),
   ]);
 
-  const grossRevenue = sales.reduce((s, v) => s + v.subtotal, 0);
-  const discounts = sales.reduce((s, v) => s + v.discount, 0);
-  const netSales = sales.reduce((s, v) => s + v.total, 0);
-  const cogs = saleItems.reduce((s, it) => s + it.quantity * it.product.costPrice, 0);
+  const grossSalesRevenue = sales.reduce((s, v) => s + v.subtotal, 0);
+  const grossOsRevenue = serviceOrders.reduce((s, o) => s + o.partsSubtotal + o.laborCost, 0);
+  const grossRevenue = grossSalesRevenue + grossOsRevenue;
+  const discounts = sales.reduce((s, v) => s + v.discount, 0) + serviceOrders.reduce((s, o) => s + o.discount, 0);
+  const nfeTaxes =
+    (invoices._sum.valueIcms ?? 0) + (invoices._sum.valuePis ?? 0) + (invoices._sum.valueCofins ?? 0) ||
+    (invoices._sum.approxTaxTotal ?? 0);
+  const netSales = grossRevenue - discounts - nfeTaxes;
+  const cogsSales = saleItems.reduce((s, it) => s + it.quantity * it.product.costPrice, 0);
+  const cogsOs = serviceOrders.reduce(
+    (s, o) => s + o.items.reduce((acc, it) => acc + it.quantity * it.product.costPrice, 0),
+    0,
+  );
+  const cogs = cogsSales + cogsOs;
   const grossProfit = netSales - cogs;
+
+  const pctAV = (val: number) => (grossRevenue > 0 ? `${num((val / grossRevenue) * 100, 1)}%` : "0,0%");
 
   const expByCat = new Map<string, number>();
   let otherIncome = 0;
@@ -139,50 +159,87 @@ export default async function RelatoriosPage({ searchParams }: { searchParams: S
       <div className="grid grid-2">
         <div className="card flush">
           <div className="card-header">
-            <h2>DRE Simplificado</h2>
+            <h2>DRE Gerencial Completo (Demonstrativo do Exercício)</h2>
           </div>
-          <table>
-            <tbody>
-              <tr>
-                <td>(+) Receita bruta de vendas</td>
-                <td className="num">{brl(grossRevenue)}</td>
-              </tr>
-              <tr>
-                <td>(−) Descontos concedidos</td>
-                <td className="num text-danger">− {brl(discounts)}</td>
-              </tr>
-              <tr className="bold">
-                <td>(=) Receita líquida de vendas</td>
-                <td className="num">{brl(netSales)}</td>
-              </tr>
-              <tr>
-                <td>(−) Custo das mercadorias vendidas (CMV)</td>
-                <td className="num text-danger">− {brl(cogs)}</td>
-              </tr>
-              <tr className="bold">
-                <td>(=) Lucro bruto</td>
-                <td className="num">{brl(grossProfit)}</td>
-              </tr>
-              {otherIncome > 0 && (
+          <div className="table-wrap">
+            <table>
+              <thead>
                 <tr>
-                  <td>(+) Outras receitas recebidas</td>
-                  <td className="num text-success">{brl(otherIncome)}</td>
+                  <th>Estrutura de Resultado</th>
+                  <th className="num">Valor (R$)</th>
+                  <th className="num">% AV</th>
                 </tr>
-              )}
-              {[...expByCat.entries()].map(([cat, val]) => (
-                <tr key={cat}>
-                  <td className="muted">(−) Despesa: {cat}</td>
-                  <td className="num text-danger">− {brl(val)}</td>
+              </thead>
+              <tbody>
+                <tr className="bold">
+                  <td>1. (+) RECEITA OPERACIONAL BRUTA</td>
+                  <td className="num">{brl(grossRevenue)}</td>
+                  <td className="num">100,0%</td>
                 </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr>
-                <td>(=) Resultado líquido do período</td>
-                <td className={`num ${netProfit >= 0 ? "text-success" : "text-danger"}`}>{brl(netProfit)}</td>
-              </tr>
-            </tfoot>
-          </table>
+                <tr>
+                  <td className="muted" style={{ paddingLeft: 24 }}>• Vendas de Mercadorias ({sales.length})</td>
+                  <td className="num">{brl(grossSalesRevenue)}</td>
+                  <td className="num muted">{pctAV(grossSalesRevenue)}</td>
+                </tr>
+                <tr>
+                  <td className="muted" style={{ paddingLeft: 24 }}>• Prestação de Serviços / OS ({serviceOrders.length})</td>
+                  <td className="num">{brl(grossOsRevenue)}</td>
+                  <td className="num muted">{pctAV(grossOsRevenue)}</td>
+                </tr>
+                <tr>
+                  <td>2. (−) Descontos Comerciais Concedidos</td>
+                  <td className="num text-danger">− {brl(discounts)}</td>
+                  <td className="num muted">{pctAV(discounts)}</td>
+                </tr>
+                <tr>
+                  <td>3. (−) Impostos Incidentes s/ Vendas (NF-e)</td>
+                  <td className="num text-danger">− {brl(nfeTaxes)}</td>
+                  <td className="num muted">{pctAV(nfeTaxes)}</td>
+                </tr>
+                <tr className="bold" style={{ background: "var(--surface-subtle)" }}>
+                  <td>4. (=) RECEITA OPERACIONAL LÍQUIDA</td>
+                  <td className="num">{brl(netSales)}</td>
+                  <td className="num">{pctAV(netSales)}</td>
+                </tr>
+                <tr>
+                  <td>5. (−) CMV / Custo Direto de Mercadorias e Peças</td>
+                  <td className="num text-danger">− {brl(cogs)}</td>
+                  <td className="num muted">{pctAV(cogs)}</td>
+                </tr>
+                <tr className="bold" style={{ background: "var(--surface-subtle)" }}>
+                  <td>6. (=) LUCRO BRUTO / MARGEM DE CONTRIBUIÇÃO</td>
+                  <td className="num">{brl(grossProfit)}</td>
+                  <td className="num">{pctAV(grossProfit)}</td>
+                </tr>
+                {otherIncome > 0 && (
+                  <tr>
+                    <td>7. (+) Outras Receitas Financeiras / Diversas</td>
+                    <td className="num text-success">{brl(otherIncome)}</td>
+                    <td className="num muted">{pctAV(otherIncome)}</td>
+                  </tr>
+                )}
+                <tr className="bold">
+                  <td>8. (−) DESPESAS OPERACIONAIS E FIXAS</td>
+                  <td className="num text-danger">− {brl(operatingExpenses)}</td>
+                  <td className="num">{pctAV(operatingExpenses)}</td>
+                </tr>
+                {[...expByCat.entries()].map(([cat, val]) => (
+                  <tr key={cat}>
+                    <td className="muted" style={{ paddingLeft: 24 }}>• {cat}</td>
+                    <td className="num text-danger">− {brl(val)}</td>
+                    <td className="num muted">{pctAV(val)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td>(=) RESULTADO LÍQUIDO DO EXERCÍCIO (LUCRO / PREJUÍZO)</td>
+                  <td className={`num ${netProfit >= 0 ? "text-success" : "text-danger"}`}>{brl(netProfit)}</td>
+                  <td className="num">{pctAV(netProfit)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
         </div>
 
         <div className="card">

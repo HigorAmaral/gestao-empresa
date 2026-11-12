@@ -247,6 +247,71 @@ export async function ensureStockLocationTables(): Promise<void> {
     await prisma.$executeRawUnsafe(`ALTER TABLE "Client" ADD COLUMN IF NOT EXISTS "ieIndicator" VARCHAR(10);`).catch(() => {});
     await prisma.$executeRawUnsafe(`ALTER TABLE "Client" ADD COLUMN IF NOT EXISTS "zipCode" VARCHAR(20);`).catch(() => {});
 
+    // 11. Tabelas Financeiras Avançadas (BankAccount) e PDV (CashSession)
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "BankAccount" (
+        "id" SERIAL PRIMARY KEY,
+        "name" VARCHAR(150) NOT NULL,
+        "bankName" VARCHAR(150),
+        "agency" VARCHAR(50),
+        "accountNumber" VARCHAR(50),
+        "type" VARCHAR(50) NOT NULL DEFAULT 'CORRENTE',
+        "initialBalance" DOUBLE PRECISION NOT NULL DEFAULT 0,
+        "active" BOOLEAN NOT NULL DEFAULT true,
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `).catch(() => {});
+
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "CashSession" (
+        "id" SERIAL PRIMARY KEY,
+        "userId" INTEGER,
+        "userName" VARCHAR(150) NOT NULL,
+        "status" VARCHAR(30) NOT NULL DEFAULT 'ABERTO',
+        "openedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "closedAt" TIMESTAMP(3),
+        "openingBalance" DOUBLE PRECISION NOT NULL DEFAULT 0,
+        "closingBalance" DOUBLE PRECISION,
+        "totalCash" DOUBLE PRECISION NOT NULL DEFAULT 0,
+        "totalPix" DOUBLE PRECISION NOT NULL DEFAULT 0,
+        "totalCard" DOUBLE PRECISION NOT NULL DEFAULT 0,
+        "totalOther" DOUBLE PRECISION NOT NULL DEFAULT 0,
+        "withdrawals" DOUBLE PRECISION NOT NULL DEFAULT 0,
+        "supplies" DOUBLE PRECISION NOT NULL DEFAULT 0,
+        "salesCount" INTEGER NOT NULL DEFAULT 0,
+        "notes" TEXT
+      );
+    `).catch(() => {});
+
+    // Colunas adicionais em Sale, ServiceOrder, FinancialEntry e ProductionOrder
+    await prisma.$executeRawUnsafe(`ALTER TABLE "Sale" ADD COLUMN IF NOT EXISTS "approvedAt" TIMESTAMP(3);`).catch(() => {});
+    await prisma.$executeRawUnsafe(`ALTER TABLE "Sale" ADD COLUMN IF NOT EXISTS "clientNotes" TEXT;`).catch(() => {});
+    await prisma.$executeRawUnsafe(`ALTER TABLE "ServiceOrder" ADD COLUMN IF NOT EXISTS "approvedAt" TIMESTAMP(3);`).catch(() => {});
+    await prisma.$executeRawUnsafe(`ALTER TABLE "ServiceOrder" ADD COLUMN IF NOT EXISTS "clientNotes" TEXT;`).catch(() => {});
+
+    await prisma.$executeRawUnsafe(`ALTER TABLE "FinancialEntry" ADD COLUMN IF NOT EXISTS "bankAccountId" INTEGER REFERENCES "BankAccount"("id") ON DELETE SET NULL;`).catch(() => {});
+    await prisma.$executeRawUnsafe(`ALTER TABLE "FinancialEntry" ADD COLUMN IF NOT EXISTS "installmentNumber" INTEGER;`).catch(() => {});
+    await prisma.$executeRawUnsafe(`ALTER TABLE "FinancialEntry" ADD COLUMN IF NOT EXISTS "installmentTotal" INTEGER;`).catch(() => {});
+    await prisma.$executeRawUnsafe(`ALTER TABLE "FinancialEntry" ADD COLUMN IF NOT EXISTS "recurrenceGroup" VARCHAR(100);`).catch(() => {});
+    await prisma.$executeRawUnsafe(`ALTER TABLE "FinancialEntry" ADD COLUMN IF NOT EXISTS "ofxFitId" VARCHAR(150);`).catch(() => {});
+
+    await prisma.$executeRawUnsafe(`ALTER TABLE "ProductionOrder" ADD COLUMN IF NOT EXISTS "producedQuantity" DOUBLE PRECISION;`).catch(() => {});
+    await prisma.$executeRawUnsafe(`ALTER TABLE "ProductionOrder" ADD COLUMN IF NOT EXISTS "scrapQuantity" DOUBLE PRECISION NOT NULL DEFAULT 0;`).catch(() => {});
+    await prisma.$executeRawUnsafe(`ALTER TABLE "ProductionOrder" ADD COLUMN IF NOT EXISTS "actualMinutes" INTEGER;`).catch(() => {});
+    await prisma.$executeRawUnsafe(`ALTER TABLE "ProductionOrder" ADD COLUMN IF NOT EXISTS "scrapReason" TEXT;`).catch(() => {});
+
+    // Popula Contas Bancárias padrão caso vazio
+    const bankCount = await prisma.bankAccount.count().catch(() => 0);
+    if (bankCount === 0) {
+      await prisma.bankAccount.createMany({
+        data: [
+          { name: "Caixa Físico (Loja / Balcão)", bankName: "Caixa Interno", type: "CAIXA", initialBalance: 500 },
+          { name: "Conta Corrente Principal", bankName: "341 - Itaú Unibanco", agency: "0001", accountNumber: "12345-6", type: "CORRENTE", initialBalance: 5000 },
+          { name: "Conta Digital PIX", bankName: "260 - Nu Pagamentos (Nubank PJ)", agency: "0001", accountNumber: "98765-0", type: "DIGITAL", initialBalance: 1500 },
+        ],
+      }).catch(() => {});
+    }
+
     // Popula máquinas padrão caso vazio
     const machineCount = await prisma.productionMachine.count().catch(() => 0);
     if (machineCount === 0) {

@@ -19,10 +19,11 @@ import {
 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { pageParams, spStr } from "@/lib/form";
-import { fmtDate, fmtDateTime, num } from "@/lib/format";
+import { fmtDate, fmtDateTime, num, brl } from "@/lib/format";
 import { ExportCsvButton, FlashMessages, PageHeader, Pagination, StatusBadge } from "@/components/ui";
 import { ensureStockLocationTables } from "@/lib/stock-location";
 import { MachinesBoardView, type MachineWithOrders } from "./MachinesBoardView";
+import { generateMrpPurchaseOrderAction } from "./actions";
 
 type SP = Promise<Record<string, string | string[] | undefined>>;
 
@@ -93,10 +94,52 @@ export default async function ProducaoPage({ searchParams }: { searchParams: SP 
       orderBy: [{ status: "desc" }, { createdAt: "asc" }],
       include: {
         product: true,
-        items: true,
+        items: { include: { product: true } },
       },
     }),
   ]);
+
+  // Cálculo MRP (Planejamento de Necessidade de Materiais) para todas as OPs ativas
+  const mrpMap = new Map<
+    number,
+    {
+      productId: number;
+      sku: string;
+      name: string;
+      unit: string;
+      stock: number;
+      costPrice: number;
+      totalRequired: number;
+      ordersCodes: string[];
+    }
+  >();
+
+  for (const op of activeOrdersForBoard) {
+    for (const it of op.items) {
+      const cur = mrpMap.get(it.productId) ?? {
+        productId: it.productId,
+        sku: it.product.sku,
+        name: it.product.name,
+        unit: it.product.unit,
+        stock: it.product.stock,
+        costPrice: it.product.costPrice > 0 ? it.product.costPrice : it.product.salePrice * 0.6,
+        totalRequired: 0,
+        ordersCodes: [],
+      };
+      cur.totalRequired += it.quantityRequired;
+      if (!cur.ordersCodes.includes(op.code)) cur.ordersCodes.push(op.code);
+      mrpMap.set(it.productId, cur);
+    }
+  }
+
+  const mrpRows = [...mrpMap.values()]
+    .map((r) => ({
+      ...r,
+      shortage: Math.max(0, Number((r.totalRequired - r.stock).toFixed(4))),
+    }))
+    .sort((a, b) => b.shortage - a.shortage);
+
+  const mrpShortagesCount = mrpRows.filter((r) => r.shortage > 0).length;
 
   // Monta as máquinas com ordens ativas para o Quadro Visual
   const machinesWithOrders: MachineWithOrders[] = allMachines.map((m) => {
@@ -161,11 +204,12 @@ export default async function ProducaoPage({ searchParams }: { searchParams: SP 
 
       <FlashMessages sp={sp} />
 
-      {/* Abas de Navegação: OPs vs Quadro de Máquinas */}
+      {/* Abas de Navegação: OPs vs Quadro de Máquinas vs MRP */}
       <div
         style={{
           display: "flex",
           gap: 8,
+          flexWrap: "wrap",
           borderBottom: "1px solid var(--border)",
           paddingBottom: 12,
           marginBottom: 20,
@@ -173,7 +217,7 @@ export default async function ProducaoPage({ searchParams }: { searchParams: SP 
       >
         <Link
           href="/producao"
-          className={`btn ${tab !== "maquinas" ? "" : "ghost"}`}
+          className={`btn ${tab !== "maquinas" && tab !== "mrp" ? "" : "ghost"}`}
           style={{ fontSize: 13 }}
         >
           <Layers size={15} /> Ordens de Produção ({total})
@@ -185,10 +229,93 @@ export default async function ProducaoPage({ searchParams }: { searchParams: SP 
         >
           <Factory size={15} /> Quadro de Máquinas & Chão de Fábrica ({allMachines.length})
         </Link>
+        <Link
+          href="/producao?tab=mrp"
+          className={`btn ${tab === "mrp" ? "" : "ghost"}`}
+          style={{ fontSize: 13 }}
+        >
+          <Package size={15} /> MRP — Necessidade de Matéria-Prima ({mrpRows.length})
+          {mrpShortagesCount > 0 && (
+            <span className="badge danger" style={{ marginLeft: 4 }}>
+              {mrpShortagesCount} falta(s)
+            </span>
+          )}
+        </Link>
       </div>
 
       {tab === "maquinas" ? (
         <MachinesBoardView machines={machinesWithOrders} />
+      ) : tab === "mrp" ? (
+        <div className="card flush">
+          <div className="card-header" style={{ flexWrap: "wrap" }}>
+            <div>
+              <h2>
+                <Package size={18} /> MRP — Planejamento de Necessidades de Materiais ({activeOrdersForBoard.length} OP(s) ativa(s))
+              </h2>
+              <p className="small muted" style={{ margin: "4px 0 0" }}>
+                Cálculo automático dos insumos exigidos por todas as OPs Planejadas e Em Produção comparado ao saldo atual em estoque.
+              </p>
+            </div>
+            {mrpShortagesCount > 0 && (
+              <form action={generateMrpPurchaseOrderAction}>
+                <button type="submit" className="btn">
+                  <Plus size={15} /> Gerar Pedido de Compra dos Faltantes ({mrpShortagesCount})
+                </button>
+              </form>
+            )}
+          </div>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>SKU</th>
+                  <th>Matéria-Prima / Insumo</th>
+                  <th>OPs Vinculadas</th>
+                  <th className="num">Exigido Total</th>
+                  <th className="num">Estoque Atual</th>
+                  <th className="num">Déficit (Falta Comprar)</th>
+                  <th className="num">Custo Estimado</th>
+                  <th>Status MRP</th>
+                </tr>
+              </thead>
+              <tbody>
+                {mrpRows.map((row) => (
+                  <tr key={row.productId}>
+                    <td className="small bold muted">{row.sku}</td>
+                    <td className="bold">
+                      <Link href={`/produtos/${row.productId}`}>{row.name}</Link>
+                    </td>
+                    <td className="small muted">{row.ordersCodes.join(", ")}</td>
+                    <td className="num bold">
+                      {num(row.totalRequired)} {row.unit}
+                    </td>
+                    <td className="num">
+                      {num(row.stock)} {row.unit}
+                    </td>
+                    <td className={`num bold ${row.shortage > 0 ? "text-danger" : "text-success"}`}>
+                      {row.shortage > 0 ? `${num(row.shortage)} ${row.unit}` : "0"}
+                    </td>
+                    <td className="num">{row.shortage > 0 ? brl(row.shortage * row.costPrice) : "—"}</td>
+                    <td>
+                      {row.shortage > 0 ? (
+                        <span className="badge danger">Comprar Insumo</span>
+                      ) : (
+                        <span className="badge success">Estoque Suficiente</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+                {mrpRows.length === 0 && (
+                  <tr>
+                    <td colSpan={8} className="empty">
+                      Nenhuma OP Planejada ou Em Produção no momento para cálculo de MRP.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
       ) : (
         <>
           {/* Estatísticas Rápidas */}

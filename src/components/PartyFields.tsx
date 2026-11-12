@@ -9,6 +9,9 @@ export type PartyLike = {
   address?: string | null;
   city?: string | null;
   state?: string | null;
+  zipCode?: string | null;
+  ie?: string | null;
+  ieIndicator?: string | null;
   notes?: string | null;
   active?: boolean;
 };
@@ -24,6 +27,15 @@ export function partyData(fd: FormData) {
     state: str(fd, "state"),
     notes: str(fd, "notes"),
     active: bool(fd, "active"),
+  };
+}
+
+export function clientPartyData(fd: FormData) {
+  return {
+    ...partyData(fd),
+    zipCode: str(fd, "zipCode"),
+    ie: str(fd, "ie"),
+    ieIndicator: str(fd, "ieIndicator") ?? "9",
   };
 }
 

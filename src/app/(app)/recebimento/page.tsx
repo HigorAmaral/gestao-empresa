@@ -21,6 +21,7 @@ import { pageParams, spStr } from "@/lib/form";
 import { brl, fmtDateTime } from "@/lib/format";
 import { ExportCsvButton, FlashMessages, PageHeader, Pagination, StatusBadge } from "@/components/ui";
 import { ConfirmButton } from "@/components/Forms";
+import { XmlImportModal } from "@/components/XmlImportModal";
 import { ensureStockLocationTables } from "@/lib/stock-location";
 import { cancelGoodsReceipt } from "./actions";
 
@@ -87,6 +88,7 @@ export default async function RecebimentoPage({ searchParams }: { searchParams: 
         subtitle="Entrada de insumos, conferência de notas fiscais e endereçamento direto no estoque"
         actions={
           <>
+            <XmlImportModal />
             <ExportCsvButton entity="recebimento" />
             <Link className="btn" href="/recebimento/novo">
               <Plus size={16} /> Novo Recebimento
