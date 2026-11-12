@@ -885,8 +885,12 @@ input, select, textarea {
   border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text);
 }
 input:focus, select:focus, textarea:focus {
-  outline: none; border-color: var(--text);
-  box-shadow: 0 0 0 2px rgba(9, 9, 11, 0.12);
+  border-color: var(--text);
+  box-shadow: 0 0 0 2px rgba(9, 9, 11, 0.14);
+}
+:focus-visible {
+  outline: 2.5px solid var(--accent, var(--primary));
+  outline-offset: 2px;
 }
 input[readonly] { background: var(--surface-subtle); color: var(--muted); }
 textarea { min-height: 80px; resize: vertical; }
@@ -1482,7 +1486,6 @@ textarea { min-height: 80px; resize: vertical; }
   border-radius: 8px;
   background: #fafafa;
   color: #09090b;
-  outline: none;
   transition: border-color 0.18s, background 0.18s, box-shadow 0.18s;
 }
 .bw-input-wrapper input:focus {
@@ -2235,13 +2238,17 @@ textarea { min-height: 80px; resize: vertical; }
   width: auto;
   min-width: 0;
   border: 0 !important;
-  outline: none !important;
   background: transparent !important;
   color: var(--text);
   padding: 4px 0;
   font-size: 15px;
   font-weight: 500;
   box-shadow: none !important;
+}
+.cmd-input-row input:focus-visible {
+  outline: 2px solid var(--accent, var(--primary));
+  outline-offset: 4px;
+  border-radius: 4px;
 }
 .cmd-close {
   flex-shrink: 0;
@@ -2741,9 +2748,8 @@ html[data-theme="dark"] .pdv-btn-shift.primary {
 }
 
 .pdv-search-input input:focus {
-  outline: none;
   border-color: var(--border-strong);
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.1);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.14);
 }
 
 .pdv-search-input .pdv-search-icon {
@@ -3046,3 +3052,108 @@ html[data-theme="dark"] .pdv-payment-btn.active {
   cursor: not-allowed;
   box-shadow: none;
 }
+
+/* ---------- Acessibilidade (WCAG, Skip Link, Alto Contraste, Texto Ampliado, Movimento Reduzido) ---------- */
+.skip-link {
+  position: fixed;
+  top: -120px;
+  left: 16px;
+  z-index: 9999;
+  padding: 10px 16px;
+  background: var(--primary);
+  color: var(--primary-fg);
+  border: 2px solid var(--accent, #2563eb);
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 14px;
+  text-decoration: none;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  transition: top 0.12s ease;
+}
+.skip-link:focus {
+  top: 14px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+html[data-font="large"] body {
+  font-size: 16px;
+}
+html[data-font="large"] .small,
+html[data-font="large"] label,
+html[data-font="large"] .btn.sm {
+  font-size: 14px;
+}
+html[data-font="large"] .btn,
+html[data-font="large"] input,
+html[data-font="large"] select,
+html[data-font="large"] textarea {
+  font-size: 15.5px;
+}
+html[data-font="large"] h1 {
+  font-size: 26px;
+}
+html[data-font="large"] h2 {
+  font-size: 18px;
+}
+
+html[data-contrast="high"] {
+  --border: #18181b;
+  --muted: #27272a;
+}
+html[data-contrast="high"][data-theme="dark"] {
+  --border: #e4e4e7;
+  --muted: #e4e4e7;
+}
+html[data-contrast="high"] .card,
+html[data-contrast="high"] .stat,
+html[data-contrast="high"] input,
+html[data-contrast="high"] select,
+html[data-contrast="high"] textarea,
+html[data-contrast="high"] .btn.secondary {
+  border-width: 2px;
+}
+html[data-contrast="high"] :focus-visible {
+  outline: 3px solid #f59e0b;
+  outline-offset: 2px;
+}
+
+html[data-motion="reduce"] *,
+html[data-motion="reduce"] *::before,
+html[data-motion="reduce"] *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@media (max-width: 800px) {
+  .mobile-nav-item,
+  .mobile-topbar .theme-btn,
+  .mobile-topbar .notifications-bell-btn {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+

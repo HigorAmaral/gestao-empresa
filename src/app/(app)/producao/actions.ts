@@ -7,6 +7,8 @@ import { requireUser } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { dateVal, intOrNull, num, str, toFormError, ValidationError, type FormState } from "@/lib/form";
 import { ensureStockLocationTables } from "@/lib/stock-location";
+import { ensureLowStockPurchaseDrafts } from "@/lib/automation";
+import { createAutomaticInspection } from "@/lib/quality";
 
 export type ProductionItemInput = {
   productId: number;
@@ -16,7 +18,7 @@ export type ProductionItemInput = {
 };
 
 function revalidateAll() {
-  for (const p of ["/producao", "/produtos", "/estoque", "/estoque/enderecamento", "/"]) {
+  for (const p of ["/producao", "/produtos", "/estoque", "/estoque/enderecamento", "/compras", "/qualidade", "/"]) {
     revalidatePath(p);
   }
 }
@@ -248,6 +250,24 @@ export async function completeProductionOrder(id: number) {
     });
 
     await logAudit(session, "PRODUCAO", "CONCLUIR", `OP #${id} concluída. Insumos baixados e produto acabado adicionado ao estoque.`, id);
+
+    const finishedOp = await prisma.productionOrder.findUnique({
+      where: { id },
+      include: { product: { select: { name: true } }, items: { select: { productId: true } } },
+    });
+    if (finishedOp) {
+      await Promise.allSettled([
+        ensureLowStockPurchaseDrafts(finishedOp.items.map((i) => i.productId)),
+        createAutomaticInspection({
+          type: "PRODUCAO",
+          title: `Inspeção de Lote — ${finishedOp.product.name} (${finishedOp.code})`,
+          productId: finishedOp.productId,
+          referenceCode: finishedOp.code,
+          sampleSize: Math.max(1, Math.min(20, Math.ceil(finishedOp.quantity * 0.1))),
+          notes: `Gerada automaticamente ao concluir ${finishedOp.code} na máquina ${finishedOp.machine}.`,
+        }),
+      ]);
+    }
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Erro ao concluir produção.";
     redirect(`/producao/${id}?erro=${encodeURIComponent(msg)}`);

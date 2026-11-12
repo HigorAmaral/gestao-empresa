@@ -39,6 +39,8 @@ export async function getNotifications(): Promise<AppNotification[]> {
     employees,
     payrollThisMonth,
     vacationsLastYear,
+    pendingQualityInspections,
+    openRncs,
   ] = await Promise.all([
     safe(prisma.financialEntry.aggregate({ where: { type: "RECEITA", status: "PENDENTE", dueDate: { lt: today } }, _count: true, _sum: { amount: true } }), null),
     safe(prisma.financialEntry.aggregate({ where: { type: "DESPESA", status: "PENDENTE", dueDate: { lt: today } }, _count: true, _sum: { amount: true } }), null),
@@ -51,6 +53,8 @@ export async function getNotifications(): Promise<AppNotification[]> {
     safe(prisma.employee.findMany({ where: { active: true }, select: { id: true, name: true, hireDate: true, birthDate: true } }), []),
     safe(prisma.financialEntry.count({ where: { category: "Salários", description: { contains: `ref. ${curLabel}` } } }), 0),
     safe(prisma.employeeLeave.findMany({ where: { type: "FERIAS", startDate: { gte: new Date(today.getTime() - 365 * DAY) } }, select: { employeeId: true } }), []),
+    safe(prisma.qualityInspection.count({ where: { status: "PENDENTE" } }), 0),
+    safe(prisma.nonConformity.findMany({ where: { status: { not: "ENCERRADA" } }, select: { severity: true, dueDate: true } }), []),
   ]);
 
   const brl = (v: number | null | undefined) => (v ?? 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -89,6 +93,23 @@ export async function getNotifications(): Promise<AppNotification[]> {
 
   if (payrollThisMonth === 0 && now.getUTCDate() >= 20 && employees.length > 0)
     list.push({ id: "rh-folha", level: "atencao", module: "funcionarios", title: `Folha de ${curLabel} ainda não fechada`, detail: "A automação diária fecha a folha a partir do dia 25, ou feche agora em 1 clique.", href: `/funcionarios/folha?month=${curMonth}`, count: 1 });
+
+  if (pendingQualityInspections > 0)
+    list.push({ id: "sgq-insp", level: "atencao", module: "qualidade", title: "Inspeções de Qualidade pendentes", detail: `${pendingQualityInspections} lote(s) de recebimento ou produção aguardando checklist de qualidade.`, href: "/qualidade", count: pendingQualityInspections });
+
+  if (openRncs.length > 0) {
+    const overdueRncs = openRncs.filter((r) => r.dueDate && r.dueDate < today).length;
+    const criticalRncs = openRncs.filter((r) => r.severity === "CRITICA" || r.severity === "ALTA").length;
+    list.push({
+      id: "sgq-rnc",
+      level: overdueRncs > 0 || criticalRncs > 0 ? "critico" : "atencao",
+      module: "qualidade",
+      title: "Não Conformidades (RNC) em aberto",
+      detail: `${openRncs.length} RNC(s) abertas (${overdueRncs} vencida(s), ${criticalRncs} alta/crítica).`,
+      href: "/qualidade?tab=rncs",
+      count: openRncs.length,
+    });
+  }
 
   const order = { critico: 0, atencao: 1, info: 2 } as const;
   return list.sort((a, b) => order[a.level] - order[b.level]);

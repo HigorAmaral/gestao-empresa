@@ -18,6 +18,7 @@ const QUICK_ACTIONS: SearchResult[] = [
   { type: "Atalho", title: "Novo Cliente", subtitle: "Cadastrar cliente na carteira", href: "/clientes/novo" },
   { type: "Atalho", title: "Novo Produto", subtitle: "Adicionar item ao catálogo", href: "/produtos/novo" },
   { type: "Atalho", title: "Consultar Estoque", subtitle: "Saldos e movimentações", href: "/estoque" },
+  { type: "SGQ", title: "Qualidade (Inspeções & RNC)", subtitle: "Checklists de lotes e Não Conformidades", href: "/qualidade" },
   { type: "RH & DP", title: "Colaboradores & Folha de Pagamento", subtitle: "Holerites CLT/PJ, Vale Quinzenal e INSS/FGTS", href: "/funcionarios" },
   { type: "RH & DP", title: "Relógio de Ponto (REP) & Espelho", subtitle: "Sincronizar máquinas de ponto físicas e horas extras", href: "/funcionarios/ponto" },
   { type: "RH & DP", title: "Férias, Atestados & Licenças", subtitle: "Controle aquisitivo/concessivo e atestados com CID", href: "/funcionarios/ferias" },
@@ -96,12 +97,23 @@ export function GlobalSearch() {
   const modal =
     open && mounted
       ? createPortal(
-          <div className="cmd-backdrop" onClick={() => setOpen(false)}>
-            <div className="cmd-modal" onClick={(e) => e.stopPropagation()}>
+          <div className="cmd-backdrop" role="presentation" onClick={() => setOpen(false)}>
+            <div
+              className="cmd-modal"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Busca global do sistema"
+              onClick={(e) => e.stopPropagation()}
+            >
               <div className="cmd-input-row">
-                <Search size={18} className="cmd-search-icon" />
+                <Search size={18} className="cmd-search-icon" aria-hidden="true" />
                 <input
                   ref={inputRef}
+                  role="combobox"
+                  aria-expanded={true}
+                  aria-controls="cmd-search-listbox"
+                  aria-activedescendant={list[activeIndex] ? `cmd-opt-${activeIndex}` : undefined}
+                  aria-label="Buscar cliente, produto, SKU, venda ou OS"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder="Busque por cliente, produto, SKU, nº da venda ou OS..."
@@ -118,13 +130,19 @@ export function GlobalSearch() {
                     }
                   }}
                 />
-                <button type="button" className="cmd-close" onClick={() => setOpen(false)} title="Fechar (Esc)">
-                  <X size={16} />
+                <button
+                  type="button"
+                  className="cmd-close"
+                  onClick={() => setOpen(false)}
+                  title="Fechar (Esc)"
+                  aria-label="Fechar busca"
+                >
+                  <X size={16} aria-hidden="true" />
                 </button>
               </div>
 
-              <div className="cmd-list">
-                <div className="cmd-section-label">
+              <div className="cmd-list" id="cmd-search-listbox" role="listbox" aria-label="Resultados da busca">
+                <div className="cmd-section-label" aria-live="polite">
                   {query.trim()
                     ? loading
                       ? "Pesquisando..."
@@ -133,8 +151,11 @@ export function GlobalSearch() {
                 </div>
                 {list.map((item, idx) => (
                   <button
+                    id={`cmd-opt-${idx}`}
                     key={item.href + idx}
                     type="button"
+                    role="option"
+                    aria-selected={idx === activeIndex}
                     className={`cmd-item ${idx === activeIndex ? "active" : ""}`}
                     onMouseEnter={() => setActiveIndex(idx)}
                     onClick={() => goTo(item.href)}

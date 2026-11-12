@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
+  Award,
   BarChart3,
   BookOpen,
   Building2,
@@ -53,6 +54,7 @@ import type { Session } from "@/lib/token";
 import { GlobalSearch } from "./GlobalSearch";
 import { PwaInstallButton } from "./PwaManager";
 import { NotificationsCenter } from "./NotificationsCenter";
+import { AccessibilityQuickButton } from "./AccessibilityManager";
 import type { AppNotification } from "@/lib/notifications";
 
 type Item = {
@@ -89,6 +91,7 @@ const SECTIONS: { title: string; items: Item[] }[] = [
       { href: "/recebimento", label: "Recebimento", Icon: PackageCheck, moduleKey: "estoque" },
       { href: "/compras", label: "Compras", Icon: Receipt, moduleKey: "compras" },
       { href: "/fornecedores", label: "Fornecedores", Icon: Truck, moduleKey: "fornecedores" },
+      { href: "/qualidade", label: "Qualidade (SGQ)", Icon: Award, moduleKey: "qualidade", alertKey: "qualidade" },
     ],
   },
   {
@@ -162,10 +165,19 @@ export function Sidebar({
     }
   }, []);
 
-  // Fecha o drawer ao mudar de rota no celular
+  // Fecha o drawer ao mudar de rota no celular ou pressionar Escape
   useEffect(() => {
     setDrawerOpen(false);
   }, [pathname]);
+
+  useEffect(() => {
+    if (!drawerOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setDrawerOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [drawerOpen]);
 
   function toggleTheme() {
     const next = !dark;
@@ -251,6 +263,7 @@ export function Sidebar({
         </div>
         <div className="brand-actions" style={{ gap: 6 }}>
           <NotificationsCenter notifications={notifications} />
+          <AccessibilityQuickButton />
           <button
             type="button"
             className="theme-btn"
@@ -269,7 +282,7 @@ export function Sidebar({
             className="theme-btn"
             onClick={toggleTheme}
             title={dark ? "Modo claro" : "Modo escuro"}
-            aria-label="Alternar tema claro/escuro"
+            aria-label={dark ? "Alternar para modo claro" : "Alternar para modo escuro"}
           >
             {dark ? <Sun size={14} /> : <Moon size={14} />}
           </button>
@@ -278,6 +291,7 @@ export function Sidebar({
             className="theme-btn"
             onClick={() => setDrawerOpen((v) => !v)}
             aria-label={drawerOpen ? "Fechar menu" : "Abrir menu"}
+            aria-expanded={drawerOpen}
           >
             {drawerOpen ? <X size={16} /> : <Menu size={16} />}
           </button>
@@ -315,10 +329,12 @@ export function Sidebar({
           </div>
           <div className="brand-actions">
             <NotificationsCenter notifications={notifications} />
+            <AccessibilityQuickButton />
             <button
               type="button"
               className="theme-btn"
               onClick={toggleTheme}
+              aria-label={dark ? "Alternar para modo claro" : "Alternar para modo escuro"}
               title={dark ? "Alternar para modo claro (P&B)" : "Alternar para modo escuro (P&B)"}
             >
               {dark ? <Sun size={14} /> : <Moon size={14} />}
@@ -343,11 +359,14 @@ export function Sidebar({
           <GlobalSearch />
         </div>
 
-        <nav onClick={(e) => {
-          if ((e.target as HTMLElement).closest("a")) {
-            setDrawerOpen(false);
-          }
-        }}>
+        <nav
+          aria-label="Menu principal"
+          onClick={(e) => {
+            if ((e.target as HTMLElement).closest("a")) {
+              setDrawerOpen(false);
+            }
+          }}
+        >
           {SECTIONS.map((section) => {
             const items = section.items.filter((i) => !i.moduleKey || hasModuleAccess(session, i.moduleKey));
             if (items.length === 0) return null;
@@ -356,15 +375,21 @@ export function Sidebar({
                 <div className="section">{section.title}</div>
                 {items.map(({ href, label, Icon, alertKey, subItem }) => {
                   const count = alertKey && alerts ? alerts[alertKey] : 0;
+                  const active = isActive(href);
                   return (
                     <Link
                       key={href}
                       href={href}
-                      className={`${isActive(href) ? "active" : ""} ${subItem ? "sidebar-subitem" : ""}`}
+                      aria-current={active ? "page" : undefined}
+                      className={`${active ? "active" : ""} ${subItem ? "sidebar-subitem" : ""}`}
                     >
-                      <Icon size={subItem ? 14 : 17} strokeWidth={2} />
+                      <Icon size={subItem ? 14 : 17} strokeWidth={2} aria-hidden="true" />
                       <span style={{ flex: 1 }}>{label}</span>
-                      {count > 0 && <span className="sidebar-badge">{count}</span>}
+                      {count > 0 && (
+                        <span className="sidebar-badge" aria-label={`${count} pendência(s)`}>
+                          {count}
+                        </span>
+                      )}
                     </Link>
                   );
                 })}
@@ -403,26 +428,42 @@ export function Sidebar({
       )}
 
       {/* Barra Fixa Inferior Estilo App Nativo (visível apenas no celular) */}
-      <nav className="mobile-bottom-nav no-print">
-        <Link href="/" className={`mobile-nav-item ${pathname === "/" ? "active" : ""}`}>
-          <LayoutDashboard size={18} />
+      <nav className="mobile-bottom-nav no-print" aria-label="Navegação rápida">
+        <Link
+          href="/"
+          aria-current={pathname === "/" ? "page" : undefined}
+          className={`mobile-nav-item ${pathname === "/" ? "active" : ""}`}
+        >
+          <LayoutDashboard size={18} aria-hidden="true" />
           <span>Início</span>
         </Link>
         {hasModuleAccess(session, "vendas") && (
-          <Link href="/vendas" className={`mobile-nav-item ${pathname.startsWith("/vendas") ? "active" : ""}`}>
-            <ShoppingCart size={18} />
+          <Link
+            href="/vendas"
+            aria-current={pathname.startsWith("/vendas") ? "page" : undefined}
+            className={`mobile-nav-item ${pathname.startsWith("/vendas") ? "active" : ""}`}
+          >
+            <ShoppingCart size={18} aria-hidden="true" />
             <span>Vendas</span>
           </Link>
         )}
         {hasModuleAccess(session, "os") && (
-          <Link href="/os" className={`mobile-nav-item ${pathname.startsWith("/os") ? "active" : ""}`}>
-            <Wrench size={18} />
+          <Link
+            href="/os"
+            aria-current={pathname.startsWith("/os") ? "page" : undefined}
+            className={`mobile-nav-item ${pathname.startsWith("/os") ? "active" : ""}`}
+          >
+            <Wrench size={18} aria-hidden="true" />
             <span>OS {alerts && alerts.os > 0 ? `(${alerts.os})` : ""}</span>
           </Link>
         )}
         {hasModuleAccess(session, "estoque") && (
-          <Link href="/estoque" className={`mobile-nav-item ${pathname.startsWith("/estoque") ? "active" : ""}`}>
-            <Warehouse size={18} />
+          <Link
+            href="/estoque"
+            aria-current={pathname.startsWith("/estoque") ? "page" : undefined}
+            className={`mobile-nav-item ${pathname.startsWith("/estoque") ? "active" : ""}`}
+          >
+            <Warehouse size={18} aria-hidden="true" />
             <span>Estoque</span>
           </Link>
         )}
@@ -430,8 +471,10 @@ export function Sidebar({
           type="button"
           className={`mobile-nav-item ${drawerOpen ? "active" : ""}`}
           onClick={() => setDrawerOpen((v) => !v)}
+          aria-expanded={drawerOpen}
+          aria-label={drawerOpen ? "Fechar menu completo" : "Abrir menu completo"}
         >
-          <Menu size={18} />
+          <Menu size={18} aria-hidden="true" />
           <span>Menu</span>
         </button>
       </nav>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Bell,
   AlertTriangle,
@@ -24,6 +24,8 @@ export function NotificationsCenter({ notifications }: { notifications: AppNotif
   const [autoError, setAutoError] = useState<string | null>(null);
   const [executionResult, setExecutionResult] = useState<AutomationResult | null>(null);
   const [dismissedIds, setDismissedIds] = useState<string[]>([]);
+  const bellRef = useRef<HTMLButtonElement>(null);
+  const closeBtnRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     try {
@@ -33,6 +35,24 @@ export function NotificationsCenter({ notifications }: { notifications: AppNotif
       }
     } catch {}
   }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    setTimeout(() => closeBtnRef.current?.focus(), 20);
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setOpen(false);
+        bellRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [open]);
+
+  function closeDrawer() {
+    setOpen(false);
+    setTimeout(() => bellRef.current?.focus(), 20);
+  }
 
   function dismiss(id: string) {
     setDismissedIds((prev) => {
@@ -77,13 +97,15 @@ export function NotificationsCenter({ notifications }: { notifications: AppNotif
   return (
     <>
       <button
+        ref={bellRef}
         type="button"
         className="notifications-bell-btn"
         onClick={() => setOpen(true)}
         title="Central de Alertas e Automações"
-        aria-label="Notificações"
+        aria-label={`Notificações (${totalCount} pendente${totalCount === 1 ? "" : "s"})`}
+        aria-expanded={open}
       >
-        <Bell size={16} />
+        <Bell size={16} aria-hidden="true" />
         {totalCount > 0 && (
           <span className={`notifications-badge-count ${criticalCount > 0 ? "critical" : ""}`}>
             {totalCount > 9 ? "9+" : totalCount}
@@ -92,19 +114,31 @@ export function NotificationsCenter({ notifications }: { notifications: AppNotif
       </button>
 
       {open && (
-        <div className="notifications-backdrop" onClick={() => setOpen(false)}>
-          <div className="notifications-drawer" onClick={(e) => e.stopPropagation()}>
+        <div className="notifications-backdrop" role="presentation" onClick={closeDrawer}>
+          <div
+            className="notifications-drawer"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="notifications-drawer-title"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="notifications-header">
               <div>
-                <h3 style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <Bell size={17} /> Notificações & Automações
+                <h3 id="notifications-drawer-title" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <Bell size={17} aria-hidden="true" /> Notificações & Automações
                 </h3>
                 <div className="small muted">
                   {totalCount} alerta(s) pendente(s) · {notifications.length} monitorados
                 </div>
               </div>
-              <button type="button" className="cmd-close" onClick={() => setOpen(false)}>
-                <X size={16} />
+              <button
+                ref={closeBtnRef}
+                type="button"
+                className="cmd-close"
+                aria-label="Fechar central de notificações"
+                onClick={closeDrawer}
+              >
+                <X size={16} aria-hidden="true" />
               </button>
             </div>
 
@@ -128,7 +162,10 @@ export function NotificationsCenter({ notifications }: { notifications: AppNotif
 
             {/* Painel do Resultado Executivo da Automação */}
             {executionResult && (
-              <div style={{ padding: "14px 16px", background: "var(--surface)", borderBottom: "1px solid var(--border)" }}>
+              <div
+                aria-live="polite"
+                style={{ padding: "14px 16px", background: "var(--surface)", borderBottom: "1px solid var(--border)" }}
+              >
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 700, fontSize: 13 }}>
                     <CheckCircle2 size={16} /> Relatório da Automação Concluída

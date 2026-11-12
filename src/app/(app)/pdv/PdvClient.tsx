@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { brl } from "@/lib/format";
 import { BarcodeScannerModal } from "@/components/BarcodeScannerModal";
+import { playAccessibleBeep } from "@/components/AccessibilityManager";
 import {
   cashMovementAction,
   closeCashSessionAction,
@@ -171,15 +172,19 @@ export function PdvClient({
       const existing = prev.find((i) => i.product.id === prod.id);
       if (existing) {
         if (existing.quantity + 1 > prod.stock) {
+          playAccessibleBeep("error");
           setFeedback({ type: "error", text: `Estoque máximo atingido para "${prod.name}" (${prod.stock} ${prod.unit}).` });
           return prev;
         }
+        playAccessibleBeep("ok");
         return prev.map((i) => (i.product.id === prod.id ? { ...i, quantity: i.quantity + 1 } : i));
       }
       if (prod.stock <= 0) {
+        playAccessibleBeep("error");
         setFeedback({ type: "error", text: `Produto "${prod.name}" está sem estoque disponível.` });
         return prev;
       }
+      playAccessibleBeep("ok");
       return [...prev, { product: prod, quantity: 1, unitPrice: prod.salePrice }];
     });
   }
@@ -247,8 +252,10 @@ export function PdvClient({
       });
 
       if (res.error) {
+        playAccessibleBeep("error");
         setFeedback({ type: "error", text: res.error });
       } else if (res.ok && res.saleId) {
+        playAccessibleBeep("ok");
         setCart([]);
         setDiscount("0");
         setCashReceived("");
@@ -378,7 +385,12 @@ export function PdvClient({
       </div>
 
       {feedback && (
-        <div className={`alert ${feedback.type === "ok" ? "success" : "error"} mb row between`} style={{ flexWrap: "wrap", alignItems: "center", gap: 10 }}>
+        <div
+          className={`alert ${feedback.type === "ok" ? "success" : "error"} mb row between`}
+          role={feedback.type === "error" ? "alert" : "status"}
+          aria-live="polite"
+          style={{ flexWrap: "wrap", alignItems: "center", gap: 10 }}
+        >
           <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontWeight: 500 }}>
             {feedback.type === "ok" && <CheckCircle2 size={16} className="icon-inline" />} {feedback.text}
           </span>
@@ -404,6 +416,7 @@ export function PdvClient({
               <Search size={16} className="pdv-search-icon" />
               <input
                 ref={searchInputRef}
+                aria-label="Buscar produto por código de barras ou nome"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 onKeyDown={handleSearchKeyDown}
@@ -416,9 +429,15 @@ export function PdvClient({
               className="pdv-btn-scan"
               onClick={() => setScannerOpen(true)}
               title="Ler Código de Barras pela Câmera"
+              aria-label="Ler código de barras pela câmera"
             >
-              <Camera size={16} /> Ler Código
+              <Camera size={16} aria-hidden="true" /> Ler Código
             </button>
+          </div>
+          <div className="small muted mb" style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: -4 }}>
+            <span><kbd>F2</kbd> Focar busca</span>
+            <span><kbd>Enter</kbd> Adicionar SKU</span>
+            <span><kbd>F4</kbd> Finalizar venda</span>
           </div>
 
           {categories.length > 0 && (

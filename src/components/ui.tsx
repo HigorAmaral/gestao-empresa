@@ -39,13 +39,13 @@ export function FlashMessages({ sp }: { sp: Record<string, string | string[] | u
   return (
     <>
       {erro && (
-        <div className="alert error">
-          <AlertCircle size={17} /> {erro}
+        <div className="alert error" role="alert" aria-live="assertive">
+          <AlertCircle size={17} aria-hidden="true" /> {erro}
         </div>
       )}
       {ok && (
-        <div className="alert success">
-          <CheckCircle2 size={17} /> {ok}
+        <div className="alert success" role="status" aria-live="polite">
+          <CheckCircle2 size={17} aria-hidden="true" /> {ok}
         </div>
       )}
     </>
@@ -115,23 +115,23 @@ export function Pagination({
     return `${basePath}?${params.toString()}`;
   };
   return (
-    <div className="pagination">
+    <nav className="pagination" aria-label="Paginação">
       <span>
         {total} registro(s) — página {page} de {pages}
       </span>
       <div className="pages">
         {page > 1 && (
-          <Link className="btn sm secondary" href={href(page - 1)}>
-            <ChevronLeft size={14} /> Anterior
+          <Link className="btn sm secondary" href={href(page - 1)} aria-label="Página anterior">
+            <ChevronLeft size={14} aria-hidden="true" /> Anterior
           </Link>
         )}
         {page < pages && (
-          <Link className="btn sm secondary" href={href(page + 1)}>
-            Próxima <ChevronRight size={14} />
+          <Link className="btn sm secondary" href={href(page + 1)} aria-label="Próxima página">
+            Próxima <ChevronRight size={14} aria-hidden="true" />
           </Link>
         )}
       </div>
-    </div>
+    </nav>
   );
 }
 
@@ -149,18 +149,18 @@ export function BarChart({
 }) {
   const max = Math.max(1, ...series.flatMap((s) => s.values));
   return (
-    <div>
+    <div role="region" aria-label="Gráfico comparativo de valores">
       {series.length > 1 && (
         <div className="legend mb">
           {series.map((s) => (
             <span key={s.label}>
-              <i className={`swatch ${s.color === "red" ? "striped" : ""}`} />
+              <i className={`swatch ${s.color === "red" ? "striped" : ""}`} aria-hidden="true" />
               {s.label}
             </span>
           ))}
         </div>
       )}
-      <div className="bars">
+      <div className="bars" aria-hidden="true">
         {labels.map((label, i) => (
           <div className="bar-col" key={label}>
             {series.length === 1 && <div className="bar-value">{format(series[0].values[i])}</div>}
@@ -178,6 +178,13 @@ export function BarChart({
           </div>
         ))}
       </div>
+      <ul className="sr-only">
+        {labels.map((label, i) => (
+          <li key={label}>
+            {label}: {series.map((s) => `${s.label} ${format(s.values[i])}`).join(", ")}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

@@ -150,6 +150,8 @@ model Product {
   recipeItems          ProductRecipeItem[]   @relation("ProductRecipe")
   usedInRecipes        ProductRecipeItem[]   @relation("ProductRecipeComponent")
   invoiceItems         InvoiceItem[]
+  qualityInspections   QualityInspection[]
+  nonConformities      NonConformity[]
 }
 
 model Employee {
@@ -773,6 +775,52 @@ model LoginAttempt {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 }
+
+// ---------- Gestão da Qualidade (SGQ / Inspeções & RNC) ----------
+
+model QualityInspection {
+  id             Int       @id @default(autoincrement())
+  code           String    @unique
+  type           String    @default("PRODUCAO") // RECEBIMENTO | PRODUCAO | OS | PRODUTO | AUDITORIA
+  title          String
+  productId      Int?
+  product        Product?  @relation(fields: [productId], references: [id], onDelete: SetNull)
+  referenceCode  String?
+  batch          String?
+  sampleSize     Int       @default(1)
+  defectiveCount Int       @default(0)
+  checklistJson  String?
+  status         String    @default("PENDENTE") // PENDENTE | APROVADA | APROVADA_RESSALVA | REPROVADA
+  inspectorName  String?
+  notes          String?
+  inspectedAt    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  nonConformities NonConformity[]
+}
+
+model NonConformity {
+  id               Int                @id @default(autoincrement())
+  code             String             @unique
+  title            String
+  origin           String             @default("INSPECAO") // INSPECAO | RECEBIMENTO | PRODUCAO | CLIENTE | INTERNA
+  severity         String             @default("MEDIA") // BAIXA | MEDIA | ALTA | CRITICA
+  status           String             @default("ABERTA") // ABERTA | EM_ANALISE | ACAO_CORRETIVA | VERIFICACAO | ENCERRADA
+  inspectionId     Int?
+  inspection       QualityInspection? @relation(fields: [inspectionId], references: [id], onDelete: SetNull)
+  productId        Int?
+  product          Product?           @relation(fields: [productId], references: [id], onDelete: SetNull)
+  description      String
+  rootCause        String?
+  correctiveAction String?
+  responsibleName  String?
+  dueDate          DateTime?
+  closedAt         DateTime?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+}
+
 
 
 

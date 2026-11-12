@@ -15,6 +15,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="app">
+      <a href="#main-content" className="skip-link">
+        Pular para o conteúdo principal
+      </a>
       <DynamicBrandTitle brandName={brandName} />
       <Sidebar
         session={session}
@@ -23,7 +26,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         alerts={alerts}
         notifications={notifications}
       />
-      <main className="main">{children}</main>
+      <main id="main-content" tabIndex={-1} className="main">
+        {children}
+      </main>
     </div>
   );
 }

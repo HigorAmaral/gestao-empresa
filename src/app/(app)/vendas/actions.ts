@@ -8,6 +8,7 @@ import { logAudit } from "@/lib/audit";
 import { dateVal, intOrNull, num, str, toFormError, ValidationError, type FormState } from "@/lib/form";
 import { parseItems, round2 } from "@/lib/items";
 import { INSTANT_PAYMENTS } from "@/lib/format";
+import { ensureLowStockPurchaseDrafts } from "@/lib/automation";
 
 function back(id: number, key: "ok" | "erro", msg: string): never {
   redirect(`/vendas/${id}?${key}=${encodeURIComponent(msg)}`);
@@ -141,6 +142,8 @@ export async function confirmSale(id: number) {
       await tx.sale.update({ where: { id }, data: { status: "CONFIRMADA" } });
     });
     await logAudit(session, "VENDAS", "CONFIRMAR", `Confirmou venda #${id}`, id);
+    const saleItems = await prisma.saleItem.findMany({ where: { saleId: id }, select: { productId: true } });
+    await ensureLowStockPurchaseDrafts(saleItems.map((i) => i.productId)).catch(() => {});
   } catch (e) {
     const r = toFormError(e);
     back(id, "erro", r?.error ?? "Erro ao confirmar.");

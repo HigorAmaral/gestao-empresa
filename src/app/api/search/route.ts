@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
 
   const numId = /^\d+$/.test(q.replace(/^#/, "")) ? Number(q.replace(/^#/, "")) : null;
 
-  const [clients, products, sales, serviceOrders] = await Promise.all([
+  const [clients, products, sales, serviceOrders, qualityInspections, nonConformities] = await Promise.all([
     prisma.client.findMany({
       where: {
         OR: [
@@ -57,6 +57,31 @@ export async function GET(req: NextRequest) {
       take: 4,
       orderBy: { id: "desc" },
     }),
+    prisma.qualityInspection
+      .findMany({
+        where: {
+          OR: [
+            { code: { contains: q, mode: "insensitive" } },
+            { title: { contains: q, mode: "insensitive" } },
+            { referenceCode: { contains: q, mode: "insensitive" } },
+          ],
+        },
+        take: 3,
+        orderBy: { id: "desc" },
+      })
+      .catch(() => []),
+    prisma.nonConformity
+      .findMany({
+        where: {
+          OR: [
+            { code: { contains: q, mode: "insensitive" } },
+            { title: { contains: q, mode: "insensitive" } },
+          ],
+        },
+        take: 3,
+        orderBy: { id: "desc" },
+      })
+      .catch(() => []),
   ]);
 
   const results = [
@@ -83,6 +108,18 @@ export async function GET(req: NextRequest) {
       title: `OS #${os.id} — ${os.equipment}`,
       subtitle: `${os.client?.name ?? "Cliente avulso"} • ${brl(os.total)}`,
       href: `/os/${os.id}`,
+    })),
+    ...qualityInspections.map((qi) => ({
+      type: "Qualidade",
+      title: `${qi.code} — ${qi.title}`,
+      subtitle: `${qi.type} • ${qi.status}`,
+      href: `/qualidade`,
+    })),
+    ...nonConformities.map((rnc) => ({
+      type: "RNC",
+      title: `${rnc.code} — ${rnc.title}`,
+      subtitle: `${rnc.severity} • ${rnc.status}`,
+      href: `/qualidade?tab=rncs`,
     })),
   ];
 

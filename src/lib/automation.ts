@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { processPayrollForMonth } from "@/lib/payroll";
-import { revalidateTag, revalidatePath } from "next/cache";
+import { ensureStockLocationTables } from "@/lib/stock-location";
+import { revalidatePath, revalidateTag } from "next/cache";
 
 export type AutomationResult = {
   timestamp: string;
@@ -9,18 +10,143 @@ export type AutomationResult = {
   sstExpiredFlagged: number;
   payrollProcessed: string | null;
   overdueTasksFlagged: number;
+  pendingQualityInspections: number;
+  overdueRncsFlagged: number;
   summary: string[];
 };
+
+/**
+ * Gera automaticamente rascunhos de Pedido de Compra (+ previsão no Financeiro)
+ * para produtos ativos com estoque <= estoque mínimo, agrupados por fornecedor
+ * (inferindo último fornecedor de compras/recebimentos quando não houver padrão).
+ */
+export async function ensureLowStockPurchaseDrafts(productIds?: number[]): Promise<number> {
+  await ensureStockLocationTables();
+  const now = new Date();
+  const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+
+  const criticalProductsAll = await prisma.$queryRaw<
+    { id: number; name: string; stock: number; minStock: number; costPrice: number; supplierId: number | null }[]
+  >`
+    SELECT id, name, stock, "minStock", "costPrice", "supplierId"
+    FROM "Product"
+    WHERE active = true AND stock <= "minStock"
+  `;
+
+  const criticalProducts =
+    productIds && productIds.length > 0
+      ? criticalProductsAll.filter((p) => productIds.includes(p.id))
+      : criticalProductsAll;
+
+  if (criticalProducts.length === 0) return 0;
+
+  // Infere último fornecedor conhecido caso o produto ainda não tenha supplierId padrão
+  const resolvedProducts = await Promise.all(
+    criticalProducts.map(async (p) => {
+      if (p.supplierId) return p;
+      const lastPurchase = await prisma.purchaseItem
+        .findFirst({
+          where: { productId: p.id },
+          orderBy: { id: "desc" },
+          include: { purchase: { select: { supplierId: true } } },
+        })
+        .catch(() => null);
+      if (lastPurchase?.purchase?.supplierId) {
+        return { ...p, supplierId: lastPurchase.purchase.supplierId, costPrice: p.costPrice || lastPurchase.unitCost };
+      }
+      const lastReceipt = await prisma.goodsReceiptItem
+        .findFirst({
+          where: { productId: p.id },
+          orderBy: { id: "desc" },
+          include: { receipt: { select: { supplierId: true } } },
+        })
+        .catch(() => null);
+      if (lastReceipt?.receipt?.supplierId) {
+        return { ...p, supplierId: lastReceipt.receipt.supplierId, costPrice: p.costPrice || lastReceipt.unitCost };
+      }
+      return p;
+    }),
+  );
+
+  const bySupplier = new Map<number | null, typeof resolvedProducts>();
+  for (const p of resolvedProducts) {
+    const supId = p.supplierId ?? null;
+    const list = bySupplier.get(supId) || [];
+    list.push(p);
+    bySupplier.set(supId, list);
+  }
+
+  let createdCount = 0;
+  for (const [supplierId, items] of bySupplier.entries()) {
+    const existingPurchase = await prisma.purchase.findFirst({
+      where: {
+        supplierId,
+        status: "PENDENTE",
+        notes: { contains: "REPOSICAO_AUTOMATICA" },
+        createdAt: { gte: today },
+      },
+    });
+
+    if (!existingPurchase) {
+      const purchaseItemsData = items.map((p) => {
+        const needQty = Math.max(1, Math.ceil(p.minStock * 2 - p.stock));
+        const unitCost = p.costPrice > 0 ? p.costPrice : 10;
+        return {
+          productId: p.id,
+          quantity: needQty,
+          unitCost,
+          total: Math.round(needQty * unitCost * 100) / 100,
+        };
+      });
+
+      const totalCost = Math.round(purchaseItemsData.reduce((s, it) => s + it.total, 0) * 100) / 100;
+
+      await prisma.purchase.create({
+        data: {
+          supplierId,
+          status: "PENDENTE",
+          total: totalCost,
+          notes: "REPOSICAO_AUTOMATICA: Gerado automaticamente para suprir estoque mínimo crítico",
+          dueDate: new Date(today.getTime() + 15 * 86400000),
+          items: { create: purchaseItemsData },
+          financial: {
+            create: {
+              type: "DESPESA",
+              description: `Compra Automática Reposição — ${items.length} produto(s)`,
+              category: "Compras",
+              amount: totalCost,
+              dueDate: new Date(today.getTime() + 15 * 86400000),
+              status: "PENDENTE",
+              notes: "Provisionamento automático de compra para estoque mínimo",
+            },
+          },
+        },
+      });
+      createdCount++;
+    }
+  }
+
+  if (createdCount > 0) {
+    revalidateTag("sidebar-alerts", "max");
+    revalidatePath("/compras");
+    revalidatePath("/financeiro");
+  }
+  return createdCount;
+}
 
 /**
  * Motor Geral de Automações do Sistema:
  * 1. Projeção e lançamento automático de despesas recorrentes (Aluguel, Luz, Internet, Assinaturas);
  * 2. Análise inteligente de estoque mínimo e geração automática de pedidos de compra em rascunho;
  * 3. Varredura de vencimento de EPIs e ASOs de segurança do trabalho;
- * 4. Fechamento automático de Folha de Pagamento do mês (caso ainda não gerada);
- * 5. Verificação e alerta de ordens de serviço atrasadas.
+ * 4. Fechamento automático de Folha de Pagamento do mês (a partir do dia 25 ou se forcePayroll=true);
+ * 5. Verificação e alerta de ordens de serviço atrasadas;
+ * 6. Faturamento automático de contratos recorrentes;
+ * 7. Verificação de inspeções de qualidade pendentes e RNCs vencidas;
+ * 8. Disparo opcional de resumo via Webhook (AUTOMATION_WEBHOOK_URL).
  */
 export async function runSystemAutomations(options?: { forcePayroll?: boolean }): Promise<AutomationResult> {
+  await ensureStockLocationTables();
   const now = new Date();
   const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
   const curY = now.getUTCFullYear();
@@ -33,21 +159,28 @@ export async function runSystemAutomations(options?: { forcePayroll?: boolean })
   let sstFlagged = 0;
   let payrollResultStr: string | null = null;
   let overdueOsCount = 0;
+  let pendingQualityInspections = 0;
+  let overdueRncsFlagged = 0;
 
-  // 1. Automação de Despesas Recorrentes (ex: Aluguel, Luz, Internet)
-  // Localiza despesas pagas em meses anteriores que possuem indicação de recorrência e projeta para o mês atual se ainda não existirem
+  // 1. Automação de Despesas Recorrentes (ignora canceladas e marcadas como [NAO_RECORRENTE])
   try {
     const fixedExpenses = await prisma.financialEntry.findMany({
       where: {
         type: "DESPESA",
         category: { in: ["Aluguel", "Energia", "Internet/Telefone", "Software", "Contabilidade"] },
+        status: { not: "CANCELADO" },
       },
-      distinct: ["description", "category"],
+      orderBy: { dueDate: "desc" },
     });
 
+    const seenBase = new Set<string>();
     for (const exp of fixedExpenses) {
-      // Verifica se já existe lançamento dessa despesa no mês atual
+      if (exp.notes?.includes("[NAO_RECORRENTE]")) continue;
       const baseDesc = exp.description.replace(/\s*—\s*ref\..*$/i, "").trim();
+      const dedupKey = `${exp.category}::${baseDesc.toLowerCase()}`;
+      if (seenBase.has(dedupKey)) continue;
+      seenBase.add(dedupKey);
+
       const existing = await prisma.financialEntry.findFirst({
         where: {
           category: exp.category,
@@ -81,73 +214,7 @@ export async function runSystemAutomations(options?: { forcePayroll?: boolean })
 
   // 2. Automação de Compras para Produtos com Estoque Abaixo do Mínimo
   try {
-    const criticalProducts = await prisma.$queryRaw<
-      { id: number; name: string; stock: number; minStock: number; costPrice: number; supplierId: number | null }[]
-    >`
-      SELECT id, name, stock, "minStock", "costPrice", "supplierId"
-      FROM "Product"
-      WHERE active = true AND stock <= "minStock"
-    `;
-
-    if (criticalProducts.length > 0) {
-      // Agrupa por fornecedor
-      const bySupplier = new Map<number | null, typeof criticalProducts>();
-      for (const p of criticalProducts) {
-        const supId = p.supplierId ?? null;
-        const list = bySupplier.get(supId) || [];
-        list.push(p);
-        bySupplier.set(supId, list);
-      }
-
-      for (const [supplierId, items] of bySupplier.entries()) {
-        // Verifica se já não foi criado um pedido pendente hoje para esse fornecedor
-        const existingPurchase = await prisma.purchase.findFirst({
-          where: {
-            supplierId,
-            status: "PENDENTE",
-            notes: { contains: "REPOSICAO_AUTOMATICA" },
-            createdAt: { gte: today },
-          },
-        });
-
-        if (!existingPurchase) {
-          const purchaseItemsData = items.map((p) => {
-            const needQty = Math.max(1, (p.minStock * 2) - p.stock);
-            return {
-              productId: p.id,
-              quantity: needQty,
-              unitCost: p.costPrice || 10,
-              total: Math.round(needQty * (p.costPrice || 10) * 100) / 100,
-            };
-          });
-
-          const totalCost = purchaseItemsData.reduce((s, it) => s + it.total, 0);
-
-          await prisma.purchase.create({
-            data: {
-              supplierId,
-              status: "PENDENTE",
-              total: totalCost,
-              notes: "REPOSICAO_AUTOMATICA: Gerado automaticamente para suprir estoque mínimo crítico",
-              dueDate: new Date(today.getTime() + 15 * 86400000),
-              items: { create: purchaseItemsData },
-              financial: {
-                create: {
-                  type: "DESPESA",
-                  description: `Compra Automática Reposição — ${items.length} produto(s)`,
-                  category: "Compras",
-                  amount: totalCost,
-                  dueDate: new Date(today.getTime() + 15 * 86400000),
-                  status: "PENDENTE",
-                  notes: "Provisionamento automático de compra para estoque mínimo",
-                },
-              },
-            },
-          });
-          lowStockOrders++;
-        }
-      }
-    }
+    lowStockOrders = await ensureLowStockPurchaseDrafts();
   } catch (err) {
     console.error("Erro na automação de compras por estoque mínimo:", err);
   }
@@ -168,7 +235,7 @@ export async function runSystemAutomations(options?: { forcePayroll?: boolean })
     console.error("Erro na atualização de SST vencidos:", err);
   }
 
-  // 4. Automação de Folha de Pagamento do Mês Atual (se for >= dia 25 ou se forcePayroll for true)
+  // 4. Automação de Folha de Pagamento do Mês Atual (a partir do dia 25 no cron automático, ou imediata quando forcePayroll=true)
   try {
     const payrollCount = await prisma.financialEntry.count({
       where: {
@@ -177,7 +244,7 @@ export async function runSystemAutomations(options?: { forcePayroll?: boolean })
       },
     });
 
-    const shouldProcessPayroll = payrollCount === 0 && (options?.forcePayroll ?? true);
+    const shouldProcessPayroll = payrollCount === 0 && (options?.forcePayroll ? true : now.getUTCDate() >= 25);
     if (shouldProcessPayroll) {
       const res = await processPayrollForMonth(curMonth, { simulateRepIfEmpty: true });
       if (res.employees > 0) {
@@ -208,10 +275,7 @@ export async function runSystemAutomations(options?: { forcePayroll?: boolean })
     const dueContracts = await prisma.contract.findMany({
       where: {
         status: "ATIVO",
-        OR: [
-          { nextBillingDate: { lte: today } },
-          { nextBillingDate: null },
-        ],
+        OR: [{ nextBillingDate: { lte: today } }, { nextBillingDate: null }],
       },
       include: { client: true },
     });
@@ -274,11 +338,25 @@ export async function runSystemAutomations(options?: { forcePayroll?: boolean })
     console.error("Erro na automação de contratos recorrentes:", err);
   }
 
+  // 7. Monitoramento da Área de Qualidade (Inspeções pendentes & RNCs vencidas)
+  try {
+    const [pendingInsp, overdueRnc] = await Promise.all([
+      prisma.qualityInspection.count({ where: { status: "PENDENTE" } }),
+      prisma.nonConformity.count({
+        where: { status: { not: "ENCERRADA" }, dueDate: { lt: today } },
+      }),
+    ]);
+    pendingQualityInspections = pendingInsp;
+    overdueRncsFlagged = overdueRnc;
+  } catch (err) {
+    console.error("Erro na verificação de qualidade:", err);
+  }
+
   // Montagem do resumo executivo das ações realizadas
   const summary: string[] = [];
 
   if (recurrentGenerated > 0) {
-    summary.push(`${recurrentGenerated} despesa(s) recorrente(s) fixas projetadas no Financeiro.`);
+    summary.push(`${recurrentGenerated} despesa(s) recorrente(s) fixa(s) projetada(s) no Financeiro.`);
   } else {
     summary.push(`Despesas fixas recorrentes: todas as despesas deste mês (${curLabel}) já estavam lançadas.`);
   }
@@ -297,8 +375,10 @@ export async function runSystemAutomations(options?: { forcePayroll?: boolean })
 
   if (payrollResultStr) {
     summary.push(`Folha de Pagamento ${curLabel}: ${payrollResultStr}.`);
-  } else {
+  } else if (options?.forcePayroll || now.getUTCDate() >= 25) {
     summary.push(`Folha de Pagamento ${curLabel}: já está fechada e lançada no Financeiro.`);
+  } else {
+    summary.push(`Folha de Pagamento ${curLabel}: fechamento automático programado a partir do dia 25.`);
   }
 
   if (sstFlagged > 0) {
@@ -311,20 +391,45 @@ export async function runSystemAutomations(options?: { forcePayroll?: boolean })
     summary.push(`${overdueOsCount} Ordem(ns) de Serviço com prazo ultrapassado sinalizadas.`);
   }
 
-  revalidatePath("/", "layout");
-  revalidatePath("/financeiro");
-  revalidatePath("/compras");
-  revalidatePath("/estoque");
-  revalidatePath("/funcionarios/folha");
-  revalidatePath("/contratos");
+  if (pendingQualityInspections > 0 || overdueRncsFlagged > 0) {
+    summary.push(
+      `Qualidade (SGQ): ${pendingQualityInspections} inspeção(ões) pendente(s) e ${overdueRncsFlagged} RNC(s) com prazo vencido.`,
+    );
+  } else {
+    summary.push("Qualidade (SGQ): nenhuma inspeção pendente ou RNC vencida.");
+  }
 
-  return {
+  const result: AutomationResult = {
     timestamp: new Date().toISOString(),
     recurrentEntriesGenerated: recurrentGenerated,
     lowStockPurchasesSuggested: lowStockOrders,
     sstExpiredFlagged: sstFlagged,
     payrollProcessed: payrollResultStr,
     overdueTasksFlagged: overdueOsCount,
+    pendingQualityInspections,
+    overdueRncsFlagged,
     summary,
   };
+
+  // 8. Disparo opcional para Webhook externo (WhatsApp / Slack / n8n)
+  const webhookUrl = process.env.AUTOMATION_WEBHOOK_URL?.trim();
+  if (webhookUrl) {
+    await fetch(webhookUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ event: "erp.automation.summary", ...result }),
+      signal: AbortSignal.timeout(5000),
+    }).catch((err) => console.error("Falha ao enviar webhook de automação:", err));
+  }
+
+  revalidateTag("sidebar-alerts", "max");
+  revalidatePath("/", "layout");
+  revalidatePath("/financeiro");
+  revalidatePath("/compras");
+  revalidatePath("/estoque");
+  revalidatePath("/funcionarios/folha");
+  revalidatePath("/contratos");
+  revalidatePath("/qualidade");
+
+  return result;
 }

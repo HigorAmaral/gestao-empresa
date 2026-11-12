@@ -7,6 +7,7 @@ import { requireUser } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { intOrNull, str, toFormError, ValidationError, type FormState } from "@/lib/form";
 import { ensureStockLocationTables } from "@/lib/stock-location";
+import { createAutomaticInspection } from "@/lib/quality";
 
 export type ReceiptItemInput = {
   productId: number;
@@ -18,7 +19,7 @@ export type ReceiptItemInput = {
 };
 
 function revalidateAll() {
-  for (const p of ["/recebimento", "/estoque", "/estoque/enderecamento", "/produtos", "/compras", "/"]) {
+  for (const p of ["/recebimento", "/estoque", "/estoque/enderecamento", "/produtos", "/compras", "/qualidade", "/"]) {
     revalidatePath(p);
   }
 }
@@ -173,6 +174,15 @@ export async function createGoodsReceipt(_prev: FormState, fd: FormData): Promis
       `Recebimento ${code} registrado com ${items.length} item(ns). NF: ${invoiceNumber || "S/N"}`,
       receiptId
     );
+    await createAutomaticInspection({
+      type: "RECEBIMENTO",
+      title: `Conferência de Qualidade — ${code}${invoiceNumber ? ` (NF ${invoiceNumber})` : ""}`,
+      productId: items[0]?.productId ? Number(items[0].productId) : null,
+      referenceCode: code,
+      batch: items[0]?.batch ?? null,
+      sampleSize: Math.max(1, items.length),
+      notes: `Inspeção de recebimento gerada automaticamente para ${items.length} item(ns).`,
+    }).catch(() => {});
   } catch (err) {
     return toFormError(err);
   }

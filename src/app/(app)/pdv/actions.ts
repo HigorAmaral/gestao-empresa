@@ -6,6 +6,7 @@ import { requireUser } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { round2 } from "@/lib/items";
 import { ensureStockLocationTables } from "@/lib/stock-location";
+import { ensureLowStockPurchaseDrafts } from "@/lib/automation";
 
 export async function openCashSessionAction(openingBalance: number, notes?: string) {
   const session = await requireUser();
@@ -236,7 +237,8 @@ export async function completePdvSaleAction(input: PdvSaleInput): Promise<{ ok?:
     });
 
     await logAudit(session, "VENDAS", "CRIAR", `Venda PDV #${createdSaleId} concluída.`, createdSaleId);
-    for (const p of ["/pdv", "/vendas", "/estoque", "/produtos", "/financeiro", "/"]) {
+    await ensureLowStockPurchaseDrafts(input.items.map((i) => i.productId)).catch(() => {});
+    for (const p of ["/pdv", "/vendas", "/estoque", "/produtos", "/compras", "/financeiro", "/"]) {
       revalidatePath(p);
     }
     return { ok: true, saleId: createdSaleId };

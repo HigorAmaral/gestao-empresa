@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { getCompanySettings } from "@/lib/audit";
 import { PwaServiceWorker } from "@/components/PwaManager";
 import { DynamicThemeStyles } from "@/components/DynamicThemeStyles";
+import { AccessibilityInitializer } from "@/components/AccessibilityManager";
 import "./globals.css";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -45,6 +46,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         />
       </head>
       <body>
+        <AccessibilityInitializer />
         <PwaServiceWorker />
         {children}
       </body>

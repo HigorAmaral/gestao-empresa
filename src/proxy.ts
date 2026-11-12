@@ -12,6 +12,7 @@ const PUBLIC_PATHS = [
   "/login",
   "/p",
   "/api/rep/sync",
+  "/api/automations/run",
   "/manifest.webmanifest",
   "/sw.js",
   "/api/pwa-icon",

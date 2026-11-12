@@ -42,12 +42,14 @@ export type SidebarAlerts = {
   os: number;
   estoque: number;
   financeiro: number;
+  qualidade: number;
 };
 
 export const getSidebarAlerts = unstable_cache(
   async (): Promise<SidebarAlerts> => {
+    await ensureStockLocationTables();
     const today = todayUTC();
-    const [openOs, lowStockRows, overdueFin] = await Promise.all([
+    const [openOs, lowStockRows, overdueFin, pendingInspections, openRncs] = await Promise.all([
       prisma.serviceOrder.count({
         where: { status: { in: ["ABERTA", "EM_ANDAMENTO", "AGUARDANDO_PECA"] } },
       }),
@@ -56,11 +58,14 @@ export const getSidebarAlerts = unstable_cache(
       prisma.financialEntry.count({
         where: { status: "PENDENTE", dueDate: { lt: today } },
       }),
+      prisma.qualityInspection.count({ where: { status: "PENDENTE" } }).catch(() => 0),
+      prisma.nonConformity.count({ where: { status: { not: "ENCERRADA" } } }).catch(() => 0),
     ]);
     return {
       os: openOs,
       estoque: Number(lowStockRows[0]?.c ?? 0),
       financeiro: overdueFin,
+      qualidade: pendingInspections + openRncs,
     };
   },
   ["sidebar-alerts"],

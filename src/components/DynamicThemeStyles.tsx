@@ -1,3 +1,15 @@
+function srgbToLinear(c: number): number {
+  const s = c / 255;
+  return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+}
+
+function relativeLuminance(r: number, g: number, b: number): number {
+  return 0.2126 * srgbToLinear(r) + 0.7152 * srgbToLinear(g) + 0.0722 * srgbToLinear(b);
+}
+
+/**
+ * Calcula a cor de texto (#09090b ou #ffffff) com maior razão de contraste WCAG 2.1.
+ */
 function getContrastColor(hexColor?: string | null): string {
   if (!hexColor) return "#ffffff";
   const hex = hexColor.replace("#", "").trim();
@@ -15,8 +27,17 @@ function getContrastColor(hexColor?: string | null): string {
   } else {
     return "#ffffff";
   }
-  const yiq = (r * 299 + g * 587 + b * 114) / 1000;
-  return yiq >= 160 ? "#09090b" : "#ffffff";
+
+  if (Number.isNaN(r) || Number.isNaN(g) || Number.isNaN(b)) return "#ffffff";
+
+  const lum = relativeLuminance(r, g, b);
+  const lumDark = relativeLuminance(9, 9, 11); // #09090b
+  const lumWhite = 1; // #ffffff
+
+  const contrastDark = (Math.max(lum, lumDark) + 0.05) / (Math.min(lum, lumDark) + 0.05);
+  const contrastWhite = (Math.max(lum, lumWhite) + 0.05) / (Math.min(lum, lumWhite) + 0.05);
+
+  return contrastDark > contrastWhite ? "#09090b" : "#ffffff";
 }
 
 export function DynamicThemeStyles({

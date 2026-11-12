@@ -12,6 +12,7 @@ export type ModuleKey =
   | "usuarios"
   | "auditoria"
   | "configuracoes"
+  | "qualidade"
   | "ti";
 
 export type ModuleInfo = {
@@ -73,6 +74,13 @@ export const APP_MODULES: ModuleInfo[] = [
     href: "/fornecedores",
     section: "Suprimentos",
     description: "Gerenciar cadastro e contatos de fornecedores.",
+  },
+  {
+    key: "qualidade",
+    label: "Qualidade (SGQ)",
+    href: "/qualidade",
+    section: "Suprimentos",
+    description: "Inspeções de qualidade, checklists de lote e Não Conformidades (RNC/CAPA).",
   },
   // Gestão & Sistema
   {
@@ -173,8 +181,13 @@ export const PERMISSION_PRESETS: { label: string; description: string; modules: 
     modules: ["ti", "usuarios", "auditoria"],
   },
   {
+    label: "Qualidade / SGQ",
+    description: "Inspeções, RNCs, Produção, Recebimento e Produtos",
+    modules: ["qualidade", "produtos", "estoque", "os"],
+  },
+  {
     label: "Liberar Todos",
-    description: "Acesso a todos os 13 módulos",
+    description: "Acesso a todos os 15 módulos",
     modules: ALL_MODULE_KEYS,
   },
 ];

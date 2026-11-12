@@ -31,6 +31,8 @@ export async function GET() {
     financialEntries,
     cashSessions,
     invoices,
+    qualityInspections,
+    nonConformities,
   ] = await Promise.all([
     prisma.companySettings.findMany(),
     prisma.client.findMany(),
@@ -50,6 +52,8 @@ export async function GET() {
     prisma.financialEntry.findMany(),
     prisma.cashSession.findMany(),
     prisma.invoice.findMany({ include: { items: true } }),
+    prisma.qualityInspection.findMany().catch(() => []),
+    prisma.nonConformity.findMany().catch(() => []),
   ]);
 
   const backupPayload = {
@@ -69,6 +73,8 @@ export async function GET() {
       productionOrders: productionOrders.length,
       financialEntries: financialEntries.length,
       invoices: invoices.length,
+      qualityInspections: qualityInspections.length,
+      nonConformities: nonConformities.length,
     },
     data: {
       companySettings,
@@ -89,6 +95,8 @@ export async function GET() {
       financialEntries,
       cashSessions,
       invoices,
+      qualityInspections,
+      nonConformities,
     },
   };
 

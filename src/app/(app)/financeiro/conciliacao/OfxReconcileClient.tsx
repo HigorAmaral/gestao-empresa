@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import {
   AlertCircle,
   Building2,
@@ -40,6 +40,15 @@ interface MatchCandidate {
   score: number; // 100 = exato
 }
 
+const DEFAULT_OFX_RULES: { keywords: string[]; category: string; type?: "CREDIT" | "DEBIT" }[] = [
+  { keywords: ["TARIFA", "CESTA", "MANUTENCAO", "TED", "DOC", "IOF", "JUROS"], category: "Tarifas Bancárias", type: "DEBIT" },
+  { keywords: ["ENERGIA", "CELESC", "CEMIG", "ENEL", "CPFL", "COPEL", "LUZ"], category: "Energia", type: "DEBIT" },
+  { keywords: ["INTERNET", "VIVO", "CLARO", "TIM", "OI ", "TELECOM", "FIBRA"], category: "Internet/Telefone", type: "DEBIT" },
+  { keywords: ["ALUGUEL", "IMOBILIARIA", "CONDOMINIO"], category: "Aluguel", type: "DEBIT" },
+  { keywords: ["SALARIO", "FOLHA", "FGTS", "INSS", "DARF"], category: "Salários", type: "DEBIT" },
+  { keywords: ["PIX RECEB", "RECEBIMENTO", "VENDAS", "CARTAO", "CIELO", "STONE", "PAGSEGURO", "MERCADO PAGO"], category: "Vendas", type: "CREDIT" },
+];
+
 export function OfxReconcileClient({
   pendingEntries,
   bankAccounts,
@@ -54,8 +63,59 @@ export function OfxReconcileClient({
     bankAccounts[0]?.id ?? "",
   );
   const [reconciledIds, setReconciledIds] = useState<string[]>([]);
+  const [learnedRules, setLearnedRules] = useState<Record<string, string>>({});
   const [isPending, startTransition] = useTransition();
   const [newEntryModalTrn, setNewEntryModalTrn] = useState<OfxTransaction | null>(null);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("ofx_category_rules_v1");
+      if (raw) setLearnedRules(JSON.parse(raw));
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    if (!newEntryModalTrn) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setNewEntryModalTrn(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [newEntryModalTrn]);
+
+  function normalizeRuleKey(memo: string) {
+    return memo.toUpperCase().replace(/\d+/g, "").replace(/\s+/g, " ").trim().slice(0, 24);
+  }
+
+  function suggestCategory(trn: OfxTransaction): { category: string; matchedRule: boolean } {
+    const upper = trn.memo.toUpperCase();
+    const ruleKey = normalizeRuleKey(trn.memo);
+    if (ruleKey && learnedRules[ruleKey]) {
+      return { category: learnedRules[ruleKey], matchedRule: true };
+    }
+    for (const r of DEFAULT_OFX_RULES) {
+      if (r.type && r.type !== trn.type) continue;
+      if (r.keywords.some((k) => upper.includes(k))) {
+        return { category: r.category, matchedRule: true };
+      }
+    }
+    return {
+      category: trn.type === "CREDIT" ? "Receitas Diversas / Vendas" : "Despesas Operacionais",
+      matchedRule: false,
+    };
+  }
+
+  function rememberRule(memo: string, category: string) {
+    const key = normalizeRuleKey(memo);
+    if (!key || !category.trim()) return;
+    setLearnedRules((prev) => {
+      const next = { ...prev, [key]: category.trim() };
+      try {
+        localStorage.setItem("ofx_category_rules_v1", JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  }
 
   function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -160,8 +220,47 @@ export function OfxReconcileClient({
     });
   }
 
+  function handleAutoCreateCategorized() {
+    if (!statement) return;
+    const autoItems = statement.transactions
+      .filter((t) => !reconciledIds.includes(t.id) && findBestMatch(t) === null)
+      .map((t) => ({ trn: t, suggestion: suggestCategory(t) }))
+      .filter((x) => x.suggestion.matchedRule);
+
+    if (autoItems.length === 0) {
+      alert("Nenhuma transação nova correspondeu às regras automáticas de categorização.");
+      return;
+    }
+
+    if (!confirm(`Lançar e baixar automaticamente ${autoItems.length} transação(ões) reconhecidas pelas regras bancárias?`)) {
+      return;
+    }
+
+    startTransition(async () => {
+      let okCount = 0;
+      for (const { trn, suggestion } of autoItems) {
+        try {
+          const fd = new FormData();
+          fd.set("type", trn.type);
+          fd.set("description", trn.memo);
+          fd.set("category", suggestion.category);
+          fd.set("amount", String(trn.amount));
+          fd.set("date", trn.date.toISOString());
+          if (selectedBankId) fd.set("bankAccountId", String(selectedBankId));
+          await createAndReconcileEntryAction(fd);
+          setReconciledIds((prev) => [...prev, trn.id]);
+          okCount++;
+        } catch {}
+      }
+      alert(`${okCount} transação(ões) lançadas e conciliadas automaticamente!`);
+    });
+  }
+
   const items = statement?.transactions || [];
   const matchedCount = items.filter((t) => !reconciledIds.includes(t.id) && findBestMatch(t) !== null).length;
+  const autoRuleCount = items.filter(
+    (t) => !reconciledIds.includes(t.id) && findBestMatch(t) === null && suggestCategory(t).matchedRule,
+  ).length;
   const newCount = items.filter((t) => !reconciledIds.includes(t.id) && findBestMatch(t) === null).length;
   const doneCount = reconciledIds.length;
 
@@ -236,16 +335,28 @@ export function OfxReconcileClient({
               </div>
             </div>
 
-            {matchedCount > 0 && (
-              <button
-                type="button"
-                className="btn"
-                onClick={handleReconcileAllMatched}
-                disabled={isPending}
-              >
-                <Sparkles size={14} /> Conciliar Todos os {matchedCount} Encontrados em 1 Clique
-              </button>
-            )}
+            <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
+              {matchedCount > 0 && (
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={handleReconcileAllMatched}
+                  disabled={isPending}
+                >
+                  <Sparkles size={14} /> Conciliar Todos os {matchedCount} Encontrados em 1 Clique
+                </button>
+              )}
+              {autoRuleCount > 0 && (
+                <button
+                  type="button"
+                  className="btn secondary"
+                  onClick={handleAutoCreateCategorized}
+                  disabled={isPending}
+                >
+                  <RefreshCw size={14} /> Auto-Lançar {autoRuleCount} Categorizado(s) por Regra
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="table-wrap">
@@ -337,23 +448,32 @@ export function OfxReconcileClient({
 
       {/* Modal / Diálogo para Lançar Novo Registro Bancário não existente no sistema */}
       {newEntryModalTrn && (
-        <div className="notifications-backdrop" onClick={() => setNewEntryModalTrn(null)}>
+        <div
+          className="notifications-backdrop"
+          onClick={() => setNewEntryModalTrn(null)}
+          role="presentation"
+        >
           <div
             className="card"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="ofx-modal-title"
             style={{ width: 480, maxWidth: "90vw", margin: "auto", animation: "loginFadeUp .15s ease" }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="mb" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <h3 id="ofx-modal-title" className="mb" style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <Plus size={16} /> Lançar e Baixar Transação do Banco
             </h3>
             <p className="small muted mb">
-              Esta transação consta no seu extrato bancário, mas não havia sido registrada no sistema. Informe a categoria para lançar e dar baixa imediata.
+              Esta transação consta no seu extrato bancário, mas não havia sido registrada no sistema. A categoria sugerida será memorizada para próximos extratos.
             </p>
 
             <form
               action={async (formData) => {
                 try {
+                  const chosenCat = String(formData.get("category") || "");
                   await createAndReconcileEntryAction(formData);
+                  rememberRule(newEntryModalTrn.memo, chosenCat);
                   setReconciledIds((prev) => [...prev, newEntryModalTrn.id]);
                   setNewEntryModalTrn(null);
                 } catch (err: unknown) {
@@ -368,27 +488,27 @@ export function OfxReconcileClient({
 
               <div className="form-grid mb">
                 <div className="field s12">
-                  <label>Descrição do Lançamento *</label>
-                  <input name="description" defaultValue={newEntryModalTrn.memo} required />
+                  <label htmlFor="ofx-desc">Descrição do Lançamento *</label>
+                  <input id="ofx-desc" name="description" defaultValue={newEntryModalTrn.memo} required />
                 </div>
                 <div className="field s6">
-                  <label>Tipo</label>
+                  <label htmlFor="ofx-type">Tipo</label>
                   <input
+                    id="ofx-type"
                     disabled
                     value={newEntryModalTrn.type === "CREDIT" ? "RECEITA (+ Entrada)" : "DESPESA (- Saída)"}
                   />
                 </div>
                 <div className="field s6">
-                  <label>Valor (R$)</label>
-                  <input disabled value={brl(newEntryModalTrn.amount)} />
+                  <label htmlFor="ofx-val">Valor (R$)</label>
+                  <input id="ofx-val" disabled value={brl(newEntryModalTrn.amount)} />
                 </div>
                 <div className="field s12">
-                  <label>Categoria Contábil *</label>
+                  <label htmlFor="ofx-cat">Categoria Contábil *</label>
                   <input
+                    id="ofx-cat"
                     name="category"
-                    defaultValue={
-                      newEntryModalTrn.type === "CREDIT" ? "Receitas Diversas / Vendas" : "Tarifas Bancárias / Despesas"
-                    }
+                    defaultValue={suggestCategory(newEntryModalTrn).category}
                     required
                   />
                 </div>

@@ -14,7 +14,7 @@ let tablesChecked = false;
  * Com a versão gravada no banco, cada cold start faz apenas 1 consulta rápida
  * em vez de ~90 comandos DDL sequenciais (principal causa de lentidão nas páginas).
  */
-const SCHEMA_VERSION = 18;
+const SCHEMA_VERSION = 19;
 let inflight: Promise<void> | null = null;
 
 export async function ensureStockLocationTables(): Promise<void> {
@@ -157,6 +157,46 @@ async function runSchemaSetup(): Promise<void> {
         "attempts" INTEGER NOT NULL DEFAULT 1,
         "lastFailed" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
         "lockedUntil" TIMESTAMP(3),
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `).catch(() => {});
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "QualityInspection" (
+        "id" SERIAL PRIMARY KEY,
+        "code" TEXT NOT NULL UNIQUE,
+        "type" TEXT NOT NULL DEFAULT 'PRODUCAO',
+        "title" TEXT NOT NULL,
+        "productId" INTEGER REFERENCES "Product"("id") ON DELETE SET NULL,
+        "referenceCode" TEXT,
+        "batch" TEXT,
+        "sampleSize" INTEGER NOT NULL DEFAULT 1,
+        "defectiveCount" INTEGER NOT NULL DEFAULT 0,
+        "checklistJson" TEXT,
+        "status" TEXT NOT NULL DEFAULT 'PENDENTE',
+        "inspectorName" TEXT,
+        "notes" TEXT,
+        "inspectedAt" TIMESTAMP(3),
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `).catch(() => {});
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "NonConformity" (
+        "id" SERIAL PRIMARY KEY,
+        "code" TEXT NOT NULL UNIQUE,
+        "title" TEXT NOT NULL,
+        "origin" TEXT NOT NULL DEFAULT 'INSPECAO',
+        "severity" TEXT NOT NULL DEFAULT 'MEDIA',
+        "status" TEXT NOT NULL DEFAULT 'ABERTA',
+        "inspectionId" INTEGER REFERENCES "QualityInspection"("id") ON DELETE SET NULL,
+        "productId" INTEGER REFERENCES "Product"("id") ON DELETE SET NULL,
+        "description" TEXT NOT NULL,
+        "rootCause" TEXT,
+        "correctiveAction" TEXT,
+        "responsibleName" TEXT,
+        "dueDate" TIMESTAMP(3),
+        "closedAt" TIMESTAMP(3),
         "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
         "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
       );
@@ -1139,6 +1179,46 @@ async function runSchemaSetup(): Promise<void> {
           "attempts" INTEGER NOT NULL DEFAULT 1,
           "lastFailed" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
           "lockedUntil" DATETIME,
+          "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+      await prisma.$executeRawUnsafe(`
+        CREATE TABLE IF NOT EXISTS "QualityInspection" (
+          "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+          "code" TEXT NOT NULL UNIQUE,
+          "type" TEXT NOT NULL DEFAULT 'PRODUCAO',
+          "title" TEXT NOT NULL,
+          "productId" INTEGER REFERENCES "Product"("id") ON DELETE SET NULL,
+          "referenceCode" TEXT,
+          "batch" TEXT,
+          "sampleSize" INTEGER NOT NULL DEFAULT 1,
+          "defectiveCount" INTEGER NOT NULL DEFAULT 0,
+          "checklistJson" TEXT,
+          "status" TEXT NOT NULL DEFAULT 'PENDENTE',
+          "inspectorName" TEXT,
+          "notes" TEXT,
+          "inspectedAt" DATETIME,
+          "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+      await prisma.$executeRawUnsafe(`
+        CREATE TABLE IF NOT EXISTS "NonConformity" (
+          "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+          "code" TEXT NOT NULL UNIQUE,
+          "title" TEXT NOT NULL,
+          "origin" TEXT NOT NULL DEFAULT 'INSPECAO',
+          "severity" TEXT NOT NULL DEFAULT 'MEDIA',
+          "status" TEXT NOT NULL DEFAULT 'ABERTA',
+          "inspectionId" INTEGER REFERENCES "QualityInspection"("id") ON DELETE SET NULL,
+          "productId" INTEGER REFERENCES "Product"("id") ON DELETE SET NULL,
+          "description" TEXT NOT NULL,
+          "rootCause" TEXT,
+          "correctiveAction" TEXT,
+          "responsibleName" TEXT,
+          "dueDate" DATETIME,
+          "closedAt" DATETIME,
           "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
           "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
