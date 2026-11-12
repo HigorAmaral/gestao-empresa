@@ -41,109 +41,107 @@ export default async function SegurancaTrabalhoSstPage({ searchParams }: { searc
 
       <RhSubnav active="sst" refMonth={refMonth} basePath="/funcionarios/sst" />
 
-      <div className="grid grid-2 mb">
-        {/* Emissão Rápida em 1 Clique por Colaborador */}
-        <div className="card flush">
-          <div style={{ padding: "14px 16px", borderBottom: "1px solid var(--border)" }}>
-            <h2 style={{ margin: 0, display: "flex", alignItems: "center", gap: 8 }}>
-              <ShieldCheck size={18} /> Ações Rápidas SST por Colaborador (1 Clique)
-            </h2>
-            <div className="small muted">
-              Registra automaticamente a entrega do Kit EPI Padrão (CA 42189) ou renova o Exame ASO Periódico com vencimento automático para 1 ano.
-            </div>
-          </div>
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Colaborador / Cargo</th>
-                  <th>Setor</th>
-                  <th>Emissão Automática (Validade +1 Ano)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {allActiveEmployees.map((emp) => (
-                  <tr key={emp.id}>
-                    <td>
-                      <div className="bold">{emp.name}</div>
-                      <div className="small muted">{emp.position}</div>
-                    </td>
-                    <td>{emp.department || "Geral"}</td>
-                    <td className="actions">
-                      <ConfirmButton
-                        action={quickIssueSstKitAction.bind(null, emp.id, "EPI")}
-                        label="🦺 Entregar Kit EPI"
-                        className="btn sm"
-                        confirmText={`Registrar entrega de Kit EPI Padrão (CA 42189) com validade de 1 ano para ${emp.name}?`}
-                      />
-                      <ConfirmButton
-                        action={quickIssueSstKitAction.bind(null, emp.id, "ASO")}
-                        label="🩺 Renovar ASO"
-                        className="btn sm secondary"
-                        confirmText={`Registrar Exame Ocupacional ASO Periódico (APTO) com validade de 1 ano para ${emp.name}?`}
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Registro Customizado */}
-        <div className="card">
-          <h2 className="mb" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <HeartPulse size={18} /> Registrar EPI Específico ou Exame Ocupacional
+      {/* Emissão Rápida em 1 Clique por Colaborador (Largura Total) */}
+      <div className="card flush mb">
+        <div style={{ padding: "14px 16px", borderBottom: "1px solid var(--border)" }}>
+          <h2 style={{ margin: 0, display: "flex", alignItems: "center", gap: 8 }}>
+            <ShieldCheck size={18} /> Ações Rápidas SST por Colaborador (1 Clique)
           </h2>
-          <p className="small muted mb">
-            Se não informar a data de validade, o sistema calcula automaticamente <strong>+12 meses</strong> a partir da data de entrega.
-          </p>
-          <form action={createSafetyRecordAction}>
-            <div className="form-grid">
-              <div className="field s6">
-                <label>Colaborador *</label>
-                <select name="employeeId" required>
-                  <option value="">Selecione...</option>
-                  {allActiveEmployees.map((e) => (
-                    <option key={e.id} value={e.id}>
-                      {e.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="field s6">
-                <label>Categoria SST *</label>
-                <select name="recordType" defaultValue="EPI">
-                  <option value="EPI">🦺 Entrega de EPI (NR-06)</option>
-                  <option value="ASO_ADMISSIONAL">🩺 ASO — Exame Admissional</option>
-                  <option value="ASO_PERIODICO">🩺 ASO — Exame Periódico Anual</option>
-                  <option value="ASO_DEMISSIONAL">🩺 ASO — Exame Demissional</option>
-                </select>
-              </div>
-              <div className="field s8">
-                <label>Descrição do EPI ou Exame *</label>
-                <input name="itemName" placeholder="Ex: Luva Nitrílica / Botina de Segurança" required />
-              </div>
-              <div className="field s4">
-                <label>Nº CA / Resultado</label>
-                <input name="caNumber" placeholder="Ex: 42189 ou APTO" />
-              </div>
-              <div className="field s6">
-                <label>Data de Entrega / Exame</label>
-                <input type="date" name="deliveryDate" defaultValue={todayInput()} />
-              </div>
-              <div className="field s6">
-                <label>Vencimento (Vazio = +1 ano automático)</label>
-                <input type="date" name="expiryDate" />
-              </div>
-              <div className="field s12">
-                <button type="submit" className="btn">
-                  <Plus size={15} /> Registrar na Ficha SST
-                </button>
-              </div>
-            </div>
-          </form>
+          <div className="small muted">
+            Registra automaticamente a entrega do Kit EPI Padrão (CA 42189) ou renova o Exame ASO Periódico com vencimento automático para 1 ano.
+          </div>
         </div>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Colaborador / Cargo</th>
+                <th>Setor</th>
+                <th>Emissão Automática (Validade +1 Ano)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {allActiveEmployees.map((emp) => (
+                <tr key={emp.id}>
+                  <td>
+                    <div className="bold">{emp.name}</div>
+                    <div className="small muted">{emp.position}</div>
+                  </td>
+                  <td>{emp.department || "Geral"}</td>
+                  <td className="actions">
+                    <ConfirmButton
+                      action={quickIssueSstKitAction.bind(null, emp.id, "EPI")}
+                      label="🦺 Entregar Kit EPI"
+                      className="btn sm"
+                      confirmText={`Registrar entrega de Kit EPI Padrão (CA 42189) com validade de 1 ano para ${emp.name}?`}
+                    />
+                    <ConfirmButton
+                      action={quickIssueSstKitAction.bind(null, emp.id, "ASO")}
+                      label="🩺 Renovar ASO"
+                      className="btn sm secondary"
+                      confirmText={`Registrar Exame Ocupacional ASO Periódico (APTO) com validade de 1 ano para ${emp.name}?`}
+                    />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Registro Customizado */}
+      <div className="card mb">
+        <h2 className="mb" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <HeartPulse size={18} /> Registrar EPI Específico ou Exame Ocupacional
+        </h2>
+        <p className="small muted mb">
+          Se não informar a data de validade, o sistema calcula automaticamente <strong>+12 meses</strong> a partir da data de entrega.
+        </p>
+        <form action={createSafetyRecordAction}>
+          <div className="form-grid">
+            <div className="field s4">
+              <label>Colaborador *</label>
+              <select name="employeeId" required>
+                <option value="">Selecione...</option>
+                {allActiveEmployees.map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="field s4">
+              <label>Categoria SST *</label>
+              <select name="recordType" defaultValue="EPI">
+                <option value="EPI">🦺 Entrega de EPI (NR-06)</option>
+                <option value="ASO_ADMISSIONAL">🩺 ASO — Exame Admissional</option>
+                <option value="ASO_PERIODICO">🩺 ASO — Exame Periódico Anual</option>
+                <option value="ASO_DEMISSIONAL">🩺 ASO — Exame Demissional</option>
+              </select>
+            </div>
+            <div className="field s4">
+              <label>Descrição do EPI ou Exame *</label>
+              <input name="itemName" placeholder="Ex: Luva Nitrílica / Botina de Segurança" required />
+            </div>
+            <div className="field s4">
+              <label>Nº CA / Resultado</label>
+              <input name="caNumber" placeholder="Ex: 42189 ou APTO" />
+            </div>
+            <div className="field s4">
+              <label>Data de Entrega / Exame</label>
+              <input type="date" name="deliveryDate" defaultValue={todayInput()} />
+            </div>
+            <div className="field s4">
+              <label>Vencimento (Vazio = +1 ano automático)</label>
+              <input type="date" name="expiryDate" />
+            </div>
+            <div className="field s12">
+              <button type="submit" className="btn">
+                <Plus size={15} /> Registrar na Ficha SST
+              </button>
+            </div>
+          </div>
+        </form>
       </div>
 
       {/* Fichas de EPI e Exames ASO Vigentes */}

@@ -93,7 +93,7 @@ export default async function RelogioPontoRepPage({ searchParams }: { searchPara
         </div>
         <div className="stat">
           <div className="label">Saldo Horas Extras (+50%)</div>
-          <div className="value" style={{ color: "var(--success, #22c55e)" }}>
+          <div className="value">
             +{fmtMinutes(totalOvertimeMinMonth)}
           </div>
           <div className="hint">integrado automaticamente à folha</div>
@@ -144,7 +144,7 @@ export default async function RelogioPontoRepPage({ searchParams }: { searchPara
                     <td className="num">
                       {otMin > 0 ? <span className="badge green">+{fmtMinutes(otMin)}</span> : "—"}
                     </td>
-                    <td className="num bold" style={{ color: otValue > 0 ? "var(--success, #22c55e)" : undefined }}>
+                    <td className="num bold">
                       {otValue > 0 ? `+${brl(otValue)}` : "R$ 0,00"}
                     </td>
                     <td className="num">

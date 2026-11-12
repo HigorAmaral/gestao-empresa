@@ -37,6 +37,14 @@ html[data-theme="dark"] {
   --primary-dark: #e4e4e7;
   --primary-fg: #09090b;
   --primary-soft: #27272a;
+  --success: #fafafa;
+  --success-soft: #27272a;
+  --danger: #fafafa;
+  --danger-soft: #27272a;
+  --warning: #e4e4e7;
+  --warning-soft: #27272a;
+  --info: #e4e4e7;
+  --info-soft: #27272a;
   --sidebar: #050507;
   --sidebar-border: #1f1f23;
   --sidebar-text: #a1a1aa;
@@ -281,10 +289,14 @@ body.sidebar-collapsed .main {
   height: 100%;
   min-width: 0;
 }
-.grid > .card > .card-header {
+.grid > .card > .card-header,
+.grid > .card > h2,
+.grid > .card > h3,
+.grid > .card > p {
   flex-shrink: 0;
 }
-.grid > .card > *:not(.card-header) {
+.grid > .card > .table-wrap,
+.grid > .card > form {
   flex: 1;
 }
 

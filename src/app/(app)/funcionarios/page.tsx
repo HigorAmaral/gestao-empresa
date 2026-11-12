@@ -186,7 +186,7 @@ export default async function FuncionariosPage({ searchParams }: { searchParams:
                     </td>
                     <td>{fmtDate(e.hireDate)}</td>
                     <td className="num">{brl(e.salary)}</td>
-                    <td className="num bold" style={{ color: "var(--success, #22c55e)" }}>
+                    <td className="num bold">
                       {brl(calc.netSalary)}
                     </td>
                     <td>

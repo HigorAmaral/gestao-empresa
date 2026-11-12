@@ -204,7 +204,7 @@ export default async function FolhaPagamentoPage({ searchParams }: { searchParam
                     </div>
                   </td>
                   <td className="num">{brl(calc.baseSalary)}</td>
-                  <td className="num" style={{ color: extras > 0 ? "var(--success, #22c55e)" : undefined }}>
+                  <td className="num bold">
                     {extras > 0 ? `+${brl(extras)}` : "—"}
                   </td>
                   <td className="num">
@@ -220,7 +220,7 @@ export default async function FolhaPagamentoPage({ searchParams }: { searchParam
                       INSS: {brl(calc.inssAmount)} · IRRF: {brl(calc.irrfAmount)}
                     </div>
                   </td>
-                  <td className="num bold" style={{ fontSize: 15, color: "var(--success, #22c55e)" }}>
+                  <td className="num bold" style={{ fontSize: 15 }}>
                     {brl(calc.netSalary)}
                   </td>
                   <td className="num small">{brl(calc.fgtsAmount)}</td>
