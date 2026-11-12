@@ -9,6 +9,7 @@ import { logAudit } from "@/lib/audit";
 import { serializePermissions } from "@/lib/permissions";
 import { bool, dateVal, num, reqStr, str, toFormError, ValidationError, type FormState } from "@/lib/form";
 import { calculateCompletePayslip, computeDayMinutes, parseAfdContent } from "@/lib/rh-calc";
+import { processPayrollForMonth } from "@/lib/payroll";
 
 export async function saveEmployee(id: number | null, _prev: FormState, fd: FormData): Promise<FormState> {
   const session = await requireAdmin("funcionarios");
@@ -738,182 +739,9 @@ export async function quickAdvanceSalary40PctAction(employeeId: number, month: s
 export async function autoProcessCompletePayrollAction(fd: FormData) {
   const session = await requireAdmin("funcionarios");
   const month = str(fd, "month") || new Date().toISOString().slice(0, 7);
-  const [y, m] = month.split("-").map(Number);
-  const startOfMonth = new Date(Date.UTC(y, m - 1, 1, 0, 0, 0));
-  const endOfMonth = new Date(Date.UTC(y, m, 0, 23, 59, 59));
-  const label = `${String(m).padStart(2, "0")}/${y}`;
+  const result = await processPayrollForMonth(month, { simulateRepIfEmpty: true });
 
-  const employees = await prisma.employee.findMany({ where: { active: true, salary: { gt: 0 } } });
-  const machine = await prisma.timeClockMachine.findFirst({ where: { active: true } });
-
-  // 1. Se ainda não houver batidas de ponto neste mês, sincroniza automaticamente da máquina REP
-  const existingLogsCount = await prisma.timeClockLog.count({
-    where: { date: { gte: startOfMonth, lte: endOfMonth } },
-  });
-  if (existingLogsCount === 0 && machine) {
-    let nsrSeq = 21000;
-    for (const emp of employees) {
-      for (const d of [3, 4, 5, 6, 7, 10, 11]) {
-        const dt = new Date(Date.UTC(y, m - 1, d, 0, 0, 0));
-        if (dt.getUTCDay() === 0 || dt.getUTCDay() === 6) continue;
-        const isOt = (emp.id + d) % 3 === 0;
-        const checkOut2 = isOt ? "18:00" : "17:00";
-        const calc = computeDayMinutes("08:00", "12:00", "13:00", checkOut2, 480);
-        nsrSeq += 4;
-        await prisma.timeClockLog.create({
-          data: {
-            employeeId: emp.id,
-            machineId: machine.id,
-            date: dt,
-            nsr: String(nsrSeq).padStart(9, "0"),
-            checkIn1: "08:00",
-            checkOut1: "12:00",
-            checkIn2: "13:00",
-            checkOut2,
-            workedMinutes: calc.workedMinutes,
-            expectedMinutes: 480,
-            overtimeMinutes: calc.overtimeMinutes,
-            lateMinutes: calc.lateMinutes,
-            source: "REP_AFD",
-            syncedToPayroll: true,
-          },
-        });
-      }
-    }
-  }
-
-  // 2. Converte automaticamente Horas Extras e Atrasos do Relógio REP em rubricas da folha
-  const monthLogs = await prisma.timeClockLog.findMany({
-    where: { date: { gte: startOfMonth, lte: endOfMonth } },
-  });
-
-  for (const emp of employees) {
-    const empLogs = monthLogs.filter((l) => l.employeeId === emp.id);
-    const totalOvertimeMin = empLogs.reduce((s, l) => s + (l.overtimeMinutes || 0), 0);
-    const totalLateMin = empLogs.reduce((s, l) => s + (l.lateMinutes || 0), 0);
-    const hourlyRate = emp.salary / 220;
-
-    await prisma.employeePayrollEvent.deleteMany({
-      where: { employeeId: emp.id, month, description: { contains: "(Relógio REP:" } },
-    });
-
-    if (totalOvertimeMin >= 10) {
-      const otVal = Math.round((totalOvertimeMin / 60) * hourlyRate * 1.5 * 100) / 100;
-      if (otVal > 0) {
-        await prisma.employeePayrollEvent.create({
-          data: {
-            employeeId: emp.id,
-            month,
-            type: "PROVENTO",
-            category: "HORA_EXTRA",
-            description: `Horas Extras 50% (Relógio REP: ${Math.floor(totalOvertimeMin / 60)}h${String(totalOvertimeMin % 60).padStart(2, "0")}m)`,
-            reference: `${Math.floor(totalOvertimeMin / 60)}h${String(totalOvertimeMin % 60).padStart(2, "0")}m`,
-            amount: otVal,
-          },
-        });
-      }
-    }
-
-    if (totalLateMin >= 15) {
-      const lateVal = Math.round((totalLateMin / 60) * hourlyRate * 100) / 100;
-      if (lateVal > 0) {
-        await prisma.employeePayrollEvent.create({
-          data: {
-            employeeId: emp.id,
-            month,
-            type: "DESCONTO",
-            category: "FALTA_ATRASO",
-            description: `Atrasos / Faltas (Relógio REP: ${Math.floor(totalLateMin / 60)}h${String(totalLateMin % 60).padStart(2, "0")}m)`,
-            reference: `${Math.floor(totalLateMin / 60)}h${String(totalLateMin % 60).padStart(2, "0")}m`,
-            amount: lateVal,
-          },
-        });
-      }
-    }
-  }
-
-  // 3. Gera ou atualiza os títulos da Folha Líquida + Guias de FGTS/INSS no Financeiro
-  const dueDate = new Date(Date.UTC(y, m, 5));
-  const fgtsDue = new Date(Date.UTC(y, m, 20));
-  let totalNet = 0;
-  let totalFgts = 0;
-  let totalInssIrrf = 0;
-
-  for (const emp of employees) {
-    const events = await prisma.employeePayrollEvent.findMany({ where: { employeeId: emp.id, month } });
-    const calc = calculateCompletePayslip(emp, events);
-    totalNet += calc.netSalary;
-    totalFgts += calc.fgtsAmount;
-    totalInssIrrf += calc.inssAmount + calc.irrfAmount;
-
-    const descPrefix = `Salário Líquido ${emp.name}`;
-    const existingFin = await prisma.financialEntry.findFirst({
-      where: { category: "Salários", description: { contains: `ref. ${label}` }, AND: [{ description: { contains: emp.name } }] },
-    });
-
-    const notesText = `Bruto: R$ ${calc.totalAdditions.toFixed(2)} | Descontos: R$ ${calc.totalDeductions.toFixed(2)} (INSS: R$ ${calc.inssAmount.toFixed(2)}, IRRF: R$ ${calc.irrfAmount.toFixed(2)}, FGTS: R$ ${calc.fgtsAmount.toFixed(2)})`;
-
-    if (existingFin) {
-      await prisma.financialEntry.update({
-        where: { id: existingFin.id },
-        data: { amount: calc.netSalary, notes: notesText },
-      });
-    } else {
-      await prisma.financialEntry.create({
-        data: {
-          type: "DESPESA",
-          description: `${descPrefix} (${emp.contractType || "CLT"}) — ref. ${label}`,
-          category: "Salários",
-          amount: calc.netSalary,
-          dueDate,
-          notes: notesText,
-        },
-      });
-    }
-  }
-
-  // Atualiza ou cria Guia FGTS e DARF INSS/IRRF
-  const existingFgts = await prisma.financialEntry.findFirst({
-    where: { description: `Guia FGTS Digital (8%) — Folha ref. ${label}` },
-  });
-  if (existingFgts) {
-    await prisma.financialEntry.update({
-      where: { id: existingFgts.id },
-      data: { amount: Math.round(totalFgts * 100) / 100 },
-    });
-  } else if (totalFgts > 0) {
-    await prisma.financialEntry.create({
-      data: {
-        type: "DESPESA",
-        description: `Guia FGTS Digital (8%) — Folha ref. ${label}`,
-        category: "Impostos",
-        amount: Math.round(totalFgts * 100) / 100,
-        dueDate: fgtsDue,
-      },
-    });
-  }
-
-  const existingDarf = await prisma.financialEntry.findFirst({
-    where: { description: `DARF Previdenciário (INSS + IRRF Retido) — Folha ref. ${label}` },
-  });
-  if (existingDarf) {
-    await prisma.financialEntry.update({
-      where: { id: existingDarf.id },
-      data: { amount: Math.round(totalInssIrrf * 100) / 100 },
-    });
-  } else if (totalInssIrrf > 0) {
-    await prisma.financialEntry.create({
-      data: {
-        type: "DESPESA",
-        description: `DARF Previdenciário (INSS + IRRF Retido) — Folha ref. ${label}`,
-        category: "Impostos",
-        amount: Math.round(totalInssIrrf * 100) / 100,
-        dueDate: fgtsDue,
-      },
-    });
-  }
-
-  await logAudit(session, "RH", "FECHAR_FOLHA_AUTO", `Processou e atualizou automaticamente Folha + Ponto REP de ${label} (Líquido R$ ${totalNet.toFixed(2)})`, null);
+  await logAudit(session, "RH", "FECHAR_FOLHA_AUTO", `Processou Folha + Ponto REP de ${result.label} (Líquido R$ ${result.totalNet.toFixed(2)})`, null);
   revalidatePath("/funcionarios");
   revalidatePath("/funcionarios/folha");
   revalidatePath("/funcionarios/ponto");
@@ -921,7 +749,7 @@ export async function autoProcessCompletePayrollAction(fd: FormData) {
   redirect(
     `/funcionarios/folha?month=${month}&ok=` +
       encodeURIComponent(
-        `Folha de ${label} automatizada com sucesso! Ponto REP sincronizado, Horas Extras calculadas e ${employees.length} holerites lançados no Financeiro (Líquido Total: R$ ${totalNet.toFixed(2)}).`
+        `Folha de ${result.label} atualizada! Ponto REP processado e ${result.employees} holerites lançados no Financeiro (Líquido Total: R$ ${result.totalNet.toFixed(2)}).`
       )
   );
 }

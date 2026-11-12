@@ -8,11 +8,60 @@ let tablesChecked = false;
  * Cria automaticamente com `CREATE TABLE IF NOT EXISTS` no PostgreSQL (ou SQLite),
  * evitando o erro "relation does not exist" no Vercel/Supabase quando o schema é atualizado.
  */
+/**
+ * Versão do schema auxiliar. INCREMENTE este número sempre que adicionar novos
+ * `CREATE TABLE` / `ALTER TABLE` / seeds em `runSchemaSetup()`.
+ * Com a versão gravada no banco, cada cold start faz apenas 1 consulta rápida
+ * em vez de ~90 comandos DDL sequenciais (principal causa de lentidão nas páginas).
+ */
+const SCHEMA_VERSION = 14;
+let inflight: Promise<void> | null = null;
+
 export async function ensureStockLocationTables(): Promise<void> {
   if (tablesChecked) return;
   if (!process.env.DATABASE_URL) return;
 
+  if (!inflight) {
+    inflight = (async () => {
+      try {
+        const rows = await prisma.$queryRawUnsafe<{ version: number }[]>(
+          `SELECT "version" FROM "_AppSchema" WHERE "id" = 1`,
+        );
+        if (Number(rows[0]?.version) === SCHEMA_VERSION) {
+          tablesChecked = true;
+          return;
+        }
+      } catch {
+        // Tabela de versão ainda não existe: segue para a configuração completa
+      }
+
+      await runSchemaSetup();
+
+      if (tablesChecked) {
+        try {
+          await prisma.$executeRawUnsafe(
+            `CREATE TABLE IF NOT EXISTS "_AppSchema" ("id" INTEGER PRIMARY KEY, "version" INTEGER NOT NULL, "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
+          );
+          await prisma.$executeRawUnsafe(
+            `INSERT INTO "_AppSchema" ("id", "version") VALUES (1, ${SCHEMA_VERSION}) ON CONFLICT ("id") DO UPDATE SET "version" = EXCLUDED."version", "updatedAt" = CURRENT_TIMESTAMP`,
+          );
+        } catch (e) {
+          console.error("Falha ao gravar versão do schema:", e);
+        }
+      }
+    })().finally(() => {
+      inflight = null;
+    });
+  }
+  return inflight;
+}
+
+async function runSchemaSetup(): Promise<void> {
+  if (tablesChecked) return;
+
   try {
+    // Status automático de SST vencidos / colunas novas da versão 14
+    await prisma.$executeRawUnsafe(`ALTER TABLE "Employee" ADD COLUMN IF NOT EXISTS "birthDate" TIMESTAMP(3);`).catch(() => {});
     // 1. Cria a tabela StockLocation no PostgreSQL
     await prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS "StockLocation" (

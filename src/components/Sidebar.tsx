@@ -44,6 +44,8 @@ import { hasModuleAccess, type ModuleKey } from "@/lib/permissions";
 import type { Session } from "@/lib/token";
 import { GlobalSearch } from "./GlobalSearch";
 import { PwaInstallButton } from "./PwaManager";
+import { NotificationsCenter } from "./NotificationsCenter";
+import type { AppNotification } from "@/lib/notifications";
 
 type Item = {
   href: string;
@@ -112,11 +114,13 @@ export function Sidebar({
   brandName = "GestãoPro",
   logoUrl,
   alerts,
+  notifications = [],
 }: {
   session: Session;
   brandName?: string;
   logoUrl?: string | null;
   alerts?: SidebarAlerts;
+  notifications?: AppNotification[];
 }) {
   const pathname = usePathname();
   const isAdmin = session.role === "ADMIN";
@@ -225,6 +229,7 @@ export function Sidebar({
           </span>
         </div>
         <div className="row" style={{ gap: 6 }}>
+          <NotificationsCenter notifications={notifications} />
           <button
             type="button"
             className="theme-btn"
@@ -288,6 +293,7 @@ export function Sidebar({
             </span>
           </div>
           <div className="row" style={{ gap: 6 }}>
+            <NotificationsCenter notifications={notifications} />
             <button
               type="button"
               className="theme-btn"
