@@ -6,6 +6,7 @@ import { requireAdmin } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { num, reqStr, str, toFormError, type FormState } from "@/lib/form";
 import { ensureStockLocationTables } from "@/lib/stock-location";
+import { executeDatabaseCleanup } from "@/lib/clean-database";
 
 export async function saveCompanySettings(_prev: FormState, fd: FormData): Promise<FormState> {
   const session = await requireAdmin("configuracoes");
@@ -46,4 +47,27 @@ export async function saveCompanySettings(_prev: FormState, fd: FormData): Promi
   revalidatePath("/login");
   revalidatePath("/configuracoes");
   return { success: "Configurações da empresa atualizadas com sucesso." };
+}
+
+export async function resetDatabaseAction(_prev: FormState, _fd: FormData): Promise<FormState> {
+  await requireAdmin("configuracoes");
+  try {
+    const result = await executeDatabaseCleanup();
+    revalidatePath("/", "layout");
+    revalidatePath("/dashboard");
+    revalidatePath("/vendas");
+    revalidatePath("/produtos");
+    revalidatePath("/clientes");
+    revalidatePath("/fornecedores");
+    revalidatePath("/financeiro");
+    revalidatePath("/rh");
+    revalidatePath("/os");
+    revalidatePath("/producao");
+    revalidatePath("/configuracoes");
+    return {
+      success: `Banco de dados limpo com sucesso! Apenas os logins autorizados foram mantidos (${result.preservedUsers.map((u) => u.name).join(", ")}).`,
+    };
+  } catch (e) {
+    return toFormError(e);
+  }
 }
