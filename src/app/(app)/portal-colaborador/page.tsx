@@ -15,9 +15,11 @@ import {
 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
+import { spStr } from "@/lib/form";
 import { brl, fmtDate, todayInput } from "@/lib/format";
 import { ensureStockLocationTables } from "@/lib/stock-location";
 import { FlashMessages, PageHeader } from "@/components/ui";
+import { EmployeeSimulatorSelect } from "./EmployeeSimulatorSelect";
 import { requestVacationAction } from "./actions";
 
 type SP = Promise<Record<string, string | string[] | undefined>>;
@@ -28,7 +30,8 @@ export default async function PortalColaboradorPage({ searchParams }: { searchPa
   const sp = await searchParams;
 
   // Busca colaborador vinculado ao usuário logado (por userId, email ou id do searchParams se admin)
-  const empIdParam = sp.empId ? Number(sp.empId) : undefined;
+  const empIdStr = spStr(sp, "empId");
+  const empIdParam = empIdStr ? Number(empIdStr) : undefined;
 
   let employee = null;
   if (empIdParam && session.role === "ADMIN") {
@@ -106,13 +109,13 @@ export default async function PortalColaboradorPage({ searchParams }: { searchPa
   }
 
   // Cálculo de período de férias
-  const hire = new Date(employee.hireDate);
+  const hire = employee.hireDate ? new Date(employee.hireDate) : new Date();
   const monthsWorked = Math.max(
     0,
     (now.getFullYear() - hire.getFullYear()) * 12 + (now.getMonth() - hire.getMonth())
   );
-  const cycleMonths = monthsWorked % 12;
-  const completedYears = Math.floor(monthsWorked / 12);
+  const cycleMonths = Number.isFinite(monthsWorked) ? monthsWorked % 12 : 0;
+  const completedYears = Number.isFinite(monthsWorked) ? Math.floor(monthsWorked / 12) : 0;
 
   return (
     <>
@@ -121,23 +124,7 @@ export default async function PortalColaboradorPage({ searchParams }: { searchPa
         subtitle={`Autoatendimento RH: consulte seus holerites oficiais, espelho de ponto, férias e segurança do trabalho.`}
         actions={
           session.role === "ADMIN" && allActiveEmployees.length > 1 ? (
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span className="small muted">Simular colaborador:</span>
-              <form method="GET">
-                <select
-                  name="empId"
-                  defaultValue={employee.id}
-                  onChange={(e) => e.target.form?.submit()}
-                  style={{ padding: "6px 10px", fontSize: 13, borderRadius: 6 }}
-                >
-                  {allActiveEmployees.map((e) => (
-                    <option key={e.id} value={e.id}>
-                      {e.name}
-                    </option>
-                  ))}
-                </select>
-              </form>
-            </div>
+            <EmployeeSimulatorSelect employees={allActiveEmployees} currentId={employee.id} />
           ) : undefined
         }
       />
