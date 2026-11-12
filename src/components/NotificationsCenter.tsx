@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import {
   Bell,
   AlertTriangle,
@@ -19,6 +20,7 @@ import type { AppNotification } from "@/lib/notifications";
 import type { AutomationResult } from "@/lib/automation";
 
 export function NotificationsCenter({ notifications }: { notifications: AppNotification[] }) {
+  const [mounted, setMounted] = useState(false);
   const [open, setOpen] = useState(false);
   const [runningAuto, setRunningAuto] = useState(false);
   const [autoError, setAutoError] = useState<string | null>(null);
@@ -28,6 +30,7 @@ export function NotificationsCenter({ notifications }: { notifications: AppNotif
   const closeBtnRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
+    setMounted(true);
     try {
       const stored = localStorage.getItem("app_dismissed_notifs_v1");
       if (stored) {
@@ -105,7 +108,7 @@ export function NotificationsCenter({ notifications }: { notifications: AppNotif
         aria-label={`Notificações (${totalCount} pendente${totalCount === 1 ? "" : "s"})`}
         aria-expanded={open}
       >
-        <Bell size={16} aria-hidden="true" />
+        <Bell size={15} aria-hidden="true" />
         {totalCount > 0 && (
           <span className={`notifications-badge-count ${criticalCount > 0 ? "critical" : ""}`}>
             {totalCount > 9 ? "9+" : totalCount}
@@ -113,148 +116,141 @@ export function NotificationsCenter({ notifications }: { notifications: AppNotif
         )}
       </button>
 
-      {open && (
-        <div className="notifications-backdrop" role="presentation" onClick={closeDrawer}>
-          <div
-            className="notifications-drawer"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="notifications-drawer-title"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="notifications-header">
-              <div>
-                <h3 id="notifications-drawer-title" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <Bell size={17} aria-hidden="true" /> Notificações & Automações
-                </h3>
-                <div className="small muted">
-                  {totalCount} alerta(s) pendente(s) · {notifications.length} monitorados
-                </div>
-              </div>
-              <button
-                ref={closeBtnRef}
-                type="button"
-                className="cmd-close"
-                aria-label="Fechar central de notificações"
-                onClick={closeDrawer}
-              >
-                <X size={16} aria-hidden="true" />
-              </button>
-            </div>
-
-            <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--border)", background: "var(--surface-subtle)" }}>
-              <button
-                type="button"
-                className="btn sm"
-                style={{ width: "100%", justifyContent: "center" }}
-                onClick={handleRunAutomations}
-                disabled={runningAuto}
-              >
-                <Sparkles size={14} />
-                {runningAuto ? "Executando Rotinas do Sistema..." : "Executar Automações Gerais do Sistema Agora"}
-              </button>
-              {autoError && (
-                <div className="small" style={{ marginTop: 8, color: "#ef4444" }}>
-                  <AlertTriangle size={12} className="icon-inline" /> {autoError}
-                </div>
-              )}
-            </div>
-
-            {/* Painel do Resultado Executivo da Automação */}
-            {executionResult && (
-              <div
-                aria-live="polite"
-                style={{ padding: "14px 16px", background: "var(--surface)", borderBottom: "1px solid var(--border)" }}
-              >
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 700, fontSize: 13 }}>
-                    <CheckCircle2 size={16} /> Relatório da Automação Concluída
-                  </div>
-                  <button
-                    type="button"
-                    className="btn sm secondary"
-                    style={{ fontSize: 11, padding: "2px 8px" }}
-                    onClick={() => window.location.reload()}
-                  >
-                    <RefreshCw size={11} /> Atualizar Tela
-                  </button>
-                </div>
-                <ul style={{ margin: "0 0 10px 0", paddingLeft: 18, fontSize: 12.5, lineHeight: 1.6 }}>
-                  {executionResult.summary?.map((msg, i) => (
-                    <li key={i}>{msg}</li>
-                  ))}
-                </ul>
-                <div className="small muted" style={{ padding: "8px 10px", background: "var(--surface-subtle)", borderRadius: 6, border: "1px solid var(--border)", lineHeight: 1.45 }}>
-                  <strong style={{ display: "block", marginBottom: 3, color: "var(--text)" }}>
-                    Por que algumas notificações continuam ativas?
-                  </strong>
-                  Alertas como <em>Contas a Pagar/Receber</em> ou <em>Férias</em> são obrigações financeiras e legais reais: o sistema gera os pedidos de compra e holerites, mas exige confirmação financeira real (baixa de pagamento) ou aprovação do RH. Você pode clicar em <strong>Dispensar</strong> em qualquer alerta caso já esteja ciente.
-                </div>
-              </div>
-            )}
-
-            <div className="notifications-list">
-              {visibleNotifications.map((n) => (
-                <div key={n.id} className={`notification-card ${n.level}`}>
-                  <div className="notif-icon">
-                    {n.level === "critico" && <AlertCircle size={18} />}
-                    {n.level === "atencao" && <AlertTriangle size={18} />}
-                    {n.level === "info" && <Info size={18} />}
-                  </div>
-                  <div className="notif-content">
-                    <div className="notif-top">
-                      <span className={`badge ${n.level === "critico" ? "red" : n.level === "atencao" ? "yellow" : "gray"}`}>
-                        {n.level.toUpperCase()}
-                      </span>
-                      <strong style={{ fontSize: 13 }}>{n.title}</strong>
-                    </div>
-                    <div className="notif-detail">{n.detail}</div>
-                    <div style={{ marginTop: 8, display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-                      <Link
-                        href={n.href}
-                        className="btn sm secondary"
-                        style={{ fontSize: 11, padding: "3px 8px", textDecoration: "none" }}
-                        onClick={() => setOpen(false)}
-                      >
-                        Resolver no Módulo <ExternalLink size={11} />
-                      </Link>
-                      <button
-                        type="button"
-                        className="btn sm secondary"
-                        style={{ fontSize: 11, padding: "3px 8px" }}
-                        onClick={() => dismiss(n.id)}
-                        title="Ocultar este alerta se já estiver ciente"
-                      >
-                        <EyeOff size={11} /> Dispensar
-                      </button>
-                    </div>
+      {open &&
+        mounted &&
+        createPortal(
+          <div className="notifications-backdrop no-print" role="presentation" onClick={closeDrawer}>
+            <aside
+              className="notifications-drawer"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="notifications-drawer-title"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="notifications-header">
+                <div className="notifications-header-info">
+                  <h3 id="notifications-drawer-title" className="notifications-header-title">
+                    <Bell size={17} aria-hidden="true" /> Notificações & Automações
+                  </h3>
+                  <div className="small muted">
+                    {totalCount} alerta(s) pendente(s) · {notifications.length} monitorados
                   </div>
                 </div>
-              ))}
-
-              {visibleNotifications.length === 0 && (
-                <div className="empty" style={{ padding: 40 }}>
-                  <CheckCircle2 size={32} style={{ display: "block", margin: "0 auto 10px", opacity: 0.5 }} />
-                  Tudo em dia! Nenhuma pendência ativa no momento.
-                </div>
-              )}
-            </div>
-
-            {dismissedCount > 0 && (
-              <div style={{ padding: "10px 16px", borderTop: "1px solid var(--border)", background: "var(--surface-subtle)", textAlign: "center" }}>
                 <button
+                  ref={closeBtnRef}
                   type="button"
-                  className="btn sm secondary"
-                  style={{ fontSize: 11, width: "100%", justifyContent: "center" }}
-                  onClick={restoreAll}
+                  className="cmd-close"
+                  aria-label="Fechar central de notificações"
+                  onClick={closeDrawer}
                 >
-                  <RotateCcw size={12} /> Restaurar {dismissedCount} alerta(s) dispensado(s)
+                  <X size={16} aria-hidden="true" />
                 </button>
               </div>
-            )}
-          </div>
-        </div>
-      )}
+
+              <div className="notifications-toolbar">
+                <button
+                  type="button"
+                  className="btn sm notifications-run-btn"
+                  onClick={handleRunAutomations}
+                  disabled={runningAuto}
+                >
+                  <Sparkles size={14} aria-hidden="true" />
+                  {runningAuto ? "Executando Rotinas do Sistema..." : "Executar Automações Gerais Agora"}
+                </button>
+                {autoError && (
+                  <div className="notifications-error" role="alert">
+                    <AlertTriangle size={13} aria-hidden="true" />
+                    <span>{autoError}</span>
+                  </div>
+                )}
+              </div>
+
+              {executionResult && (
+                <div className="notifications-result" aria-live="polite">
+                  <div className="notifications-result-header">
+                    <div className="notifications-result-title">
+                      <CheckCircle2 size={16} aria-hidden="true" /> Relatório da Automação Concluída
+                    </div>
+                    <button
+                      type="button"
+                      className="btn sm secondary notifications-mini-btn"
+                      onClick={() => window.location.reload()}
+                    >
+                      <RefreshCw size={11} aria-hidden="true" /> Atualizar Tela
+                    </button>
+                  </div>
+                  <ul className="notifications-result-list">
+                    {executionResult.summary?.map((msg, i) => (
+                      <li key={i}>{msg}</li>
+                    ))}
+                  </ul>
+                  <div className="notifications-note small muted">
+                    <strong>Por que algumas notificações continuam ativas?</strong>
+                    Alertas como <em>Contas a Pagar/Receber</em> ou <em>Férias</em> exigem confirmação financeira real ou aprovação do RH. Você pode clicar em <strong>Dispensar</strong> caso já esteja ciente.
+                  </div>
+                </div>
+              )}
+
+              <div className="notifications-list">
+                {visibleNotifications.map((n) => (
+                  <div key={n.id} className={`notification-card ${n.level}`}>
+                    <div className="notif-icon" aria-hidden="true">
+                      {n.level === "critico" && <AlertCircle size={18} />}
+                      {n.level === "atencao" && <AlertTriangle size={18} />}
+                      {n.level === "info" && <Info size={18} />}
+                    </div>
+                    <div className="notif-content">
+                      <div className="notif-top">
+                        <span className={`badge ${n.level === "critico" ? "red" : n.level === "atencao" ? "yellow" : "gray"}`}>
+                          {n.level.toUpperCase()}
+                        </span>
+                        <strong className="notif-title">{n.title}</strong>
+                      </div>
+                      <div className="notif-detail">{n.detail}</div>
+                      <div className="notif-actions">
+                        <Link
+                          href={n.href}
+                          className="btn sm secondary notifications-mini-btn"
+                          onClick={closeDrawer}
+                        >
+                          Resolver no Módulo <ExternalLink size={11} aria-hidden="true" />
+                        </Link>
+                        <button
+                          type="button"
+                          className="btn sm secondary notifications-mini-btn"
+                          onClick={() => dismiss(n.id)}
+                          title="Ocultar este alerta se já estiver ciente"
+                        >
+                          <EyeOff size={11} aria-hidden="true" /> Dispensar
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                {visibleNotifications.length === 0 && (
+                  <div className="notifications-empty">
+                    <CheckCircle2 size={32} aria-hidden="true" />
+                    <p>Tudo em dia! Nenhuma pendência ativa no momento.</p>
+                  </div>
+                )}
+              </div>
+
+              {dismissedCount > 0 && (
+                <div className="notifications-footer">
+                  <button
+                    type="button"
+                    className="btn sm secondary notifications-run-btn"
+                    onClick={restoreAll}
+                  >
+                    <RotateCcw size={12} aria-hidden="true" /> Restaurar {dismissedCount} alerta(s) dispensado(s)
+                  </button>
+                </div>
+              )}
+            </aside>
+          </div>,
+          document.body,
+        )}
     </>
   );
 }

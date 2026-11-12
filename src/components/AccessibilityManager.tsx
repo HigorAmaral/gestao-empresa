@@ -216,26 +216,24 @@ export function AccessibilityQuickButton() {
     <>
       <button
         type="button"
-        className="theme-btn"
+        className={`theme-btn ${hasActive ? "a11y-active" : ""}`}
         onClick={() => setOpen(true)}
         title="Acessibilidade (Fonte, Alto Contraste, Som)"
         aria-label="Abrir opções de acessibilidade"
         aria-expanded={open}
-        style={hasActive ? { borderColor: "#ffffff" } : undefined}
       >
-        <Accessibility size={14} />
+        <Accessibility size={14} aria-hidden="true" />
       </button>
 
       {open &&
         mounted &&
         createPortal(
-          <div className="notifications-backdrop" role="presentation" onClick={() => setOpen(false)}>
+          <div className="a11y-backdrop no-print" role="presentation" onClick={() => setOpen(false)}>
             <div
-              className="card"
+              className="card a11y-dialog"
               role="dialog"
               aria-modal="true"
               aria-labelledby="a11y-dialog-title"
-              style={{ width: 460, maxWidth: "92vw", margin: "auto" }}
               onClick={(e) => e.stopPropagation()}
             >
               <div className="row between mb">

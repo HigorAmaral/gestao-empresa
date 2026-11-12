@@ -154,9 +154,14 @@ export function Sidebar({
   notifications?: AppNotification[];
 }) {
   const pathname = usePathname();
+  const [currentSearch, setCurrentSearch] = useState("");
   const [dark, setDark] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+
+  useEffect(() => {
+    setCurrentSearch(typeof window !== "undefined" ? window.location.search : "");
+  }, [pathname]);
 
   useEffect(() => {
     const saved = localStorage.getItem("theme");
@@ -224,16 +229,31 @@ export function Sidebar({
   }
 
   const allHrefs = SECTIONS.flatMap((s) => s.items.map((i) => i.href));
+  const currentTab = new URLSearchParams(currentSearch).get("tab");
   const isActive = (href: string) => {
-    if (href === "/") return pathname === "/";
-    if (pathname === href) return true;
-    if (pathname.startsWith(href + "/")) {
-      const hasMoreSpecific = allHrefs.some(
-        (other) =>
-          other !== href &&
-          other.startsWith(href) &&
-          (pathname === other || pathname.startsWith(other + "/"))
-      );
+    const [hrefPath, hrefQuery] = href.split("?");
+    if (hrefQuery) {
+      const targetTab = new URLSearchParams(hrefQuery).get("tab");
+      return pathname === hrefPath && currentTab === targetTab;
+    }
+    if (hrefPath === "/") return pathname === "/";
+    if (pathname === hrefPath) {
+      const hasMatchingTabSibling = allHrefs.some((other) => {
+        const [otherPath, otherQuery] = other.split("?");
+        if (otherPath !== hrefPath || !otherQuery) return false;
+        return new URLSearchParams(otherQuery).get("tab") === currentTab;
+      });
+      return !hasMatchingTabSibling;
+    }
+    if (pathname.startsWith(hrefPath + "/")) {
+      const hasMoreSpecific = allHrefs.some((other) => {
+        const [otherPath] = other.split("?");
+        return (
+          otherPath !== hrefPath &&
+          otherPath.startsWith(hrefPath) &&
+          (pathname === otherPath || pathname.startsWith(otherPath + "/"))
+        );
+      });
       return !hasMoreSpecific;
     }
     return false;
@@ -263,11 +283,9 @@ export function Sidebar({
               <Building2 size={18} strokeWidth={2.2} />
             </div>
           )}
-          <span style={{ maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {brandName}
-          </span>
+          <span className="brand-title">{brandName}</span>
         </div>
-        <div className="brand-actions" style={{ gap: 6 }}>
+        <div className="brand-actions">
           <NotificationsCenter notifications={notifications} />
           <AccessibilityQuickButton />
           <button
@@ -370,6 +388,9 @@ export function Sidebar({
           onClick={(e) => {
             if ((e.target as HTMLElement).closest("a")) {
               setDrawerOpen(false);
+              setTimeout(() => {
+                setCurrentSearch(typeof window !== "undefined" ? window.location.search : "");
+              }, 0);
             }
           }}
         >
