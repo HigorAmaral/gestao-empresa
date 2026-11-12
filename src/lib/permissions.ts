@@ -197,7 +197,13 @@ export function canAccessPath(
   pathname: string,
 ): boolean {
   if (session.role === "ADMIN") return true;
-  if (pathname === "/" || pathname === "/login" || pathname.startsWith("/perfil") || pathname.startsWith("/api")) {
+  if (
+    pathname === "/" ||
+    pathname === "/login" ||
+    pathname.startsWith("/perfil") ||
+    pathname.startsWith("/suporte-ti") ||
+    pathname.startsWith("/api")
+  ) {
     return true;
   }
   if (pathname === "/pdv" || pathname.startsWith("/pdv/") || pathname === "/nfe" || pathname.startsWith("/nfe/")) {

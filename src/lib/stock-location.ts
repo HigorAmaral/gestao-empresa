@@ -14,7 +14,7 @@ let tablesChecked = false;
  * Com a versão gravada no banco, cada cold start faz apenas 1 consulta rápida
  * em vez de ~90 comandos DDL sequenciais (principal causa de lentidão nas páginas).
  */
-const SCHEMA_VERSION = 15;
+const SCHEMA_VERSION = 16;
 let inflight: Promise<void> | null = null;
 
 export async function ensureStockLocationTables(): Promise<void> {
@@ -82,6 +82,26 @@ async function runSchemaSetup(): Promise<void> {
         "lastBilledAt" TIMESTAMP(3),
         "nextBillingDate" TIMESTAMP(3),
         "notes" TEXT,
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `).catch(() => {});
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "ItTicket" (
+        "id" SERIAL PRIMARY KEY,
+        "ticketNumber" TEXT NOT NULL UNIQUE,
+        "requesterName" TEXT NOT NULL,
+        "requesterEmail" TEXT,
+        "requesterPhone" TEXT,
+        "department" TEXT,
+        "category" TEXT NOT NULL DEFAULT 'OUTRO',
+        "priority" TEXT NOT NULL DEFAULT 'NORMAL',
+        "status" TEXT NOT NULL DEFAULT 'ABERTO',
+        "title" TEXT NOT NULL,
+        "description" TEXT NOT NULL,
+        "solutionNotes" TEXT,
+        "assignedTo" TEXT,
+        "resolvedAt" TIMESTAMP(3),
         "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
         "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
       );
@@ -974,6 +994,26 @@ async function runSchemaSetup(): Promise<void> {
           "pisValue" REAL NOT NULL DEFAULT 0,
           "cofinsRate" REAL NOT NULL DEFAULT 0,
           "cofinsValue" REAL NOT NULL DEFAULT 0
+        );
+      `);
+      await prisma.$executeRawUnsafe(`
+        CREATE TABLE IF NOT EXISTS "ItTicket" (
+          "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+          "ticketNumber" TEXT NOT NULL UNIQUE,
+          "requesterName" TEXT NOT NULL,
+          "requesterEmail" TEXT,
+          "requesterPhone" TEXT,
+          "department" TEXT,
+          "category" TEXT NOT NULL DEFAULT 'OUTRO',
+          "priority" TEXT NOT NULL DEFAULT 'NORMAL',
+          "status" TEXT NOT NULL DEFAULT 'ABERTO',
+          "title" TEXT NOT NULL,
+          "description" TEXT NOT NULL,
+          "solutionNotes" TEXT,
+          "assignedTo" TEXT,
+          "resolvedAt" DATETIME,
+          "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
       `);
       tablesChecked = true;

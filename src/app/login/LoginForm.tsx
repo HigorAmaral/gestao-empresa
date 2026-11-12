@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { login } from "./actions";
 import { MascotWall, type MascotState } from "./MascotWall";
+import { OpenTicketModal } from "./OpenTicketModal";
 
 export interface LoginFormProps {
   brandName: string;
@@ -348,78 +349,15 @@ export function LoginForm({
         </div>
       </main>
 
-      {/* Modal Monocromático de Suporte & Redefinição de Senha */}
-      {showHelpModal && (
-        <div className="bw-modal-overlay" onClick={() => setShowHelpModal(false)}>
-          <div
-            className="bw-modal-card"
-            onClick={(e) => e.stopPropagation()}
-            role="dialog"
-            aria-modal="true"
-          >
-            <div className="bw-modal-header">
-              <div className="bw-modal-title">
-                <HelpCircle size={18} />
-                <h3>Suporte Corporativo & Redefinição de Senha</h3>
-              </div>
-              <button
-                type="button"
-                className="bw-modal-close"
-                onClick={() => setShowHelpModal(false)}
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="bw-modal-body">
-              <p>
-                Por motivos de governança e proteção de dados (LGPD), a redefinição de senhas é
-                realizada diretamente pelo administrador do sistema ou pela equipe de TI.
-              </p>
-
-              <div className="bw-contact-list">
-                {companyEmail && (
-                  <div className="bw-contact-item">
-                    <Mail size={16} />
-                    <div>
-                      <small>E-mail da Empresa</small>
-                      <strong>{companyEmail}</strong>
-                    </div>
-                  </div>
-                )}
-                {companyPhone && (
-                  <div className="bw-contact-item">
-                    <Phone size={16} />
-                    <div>
-                      <small>Telefone / Ramal</small>
-                      <strong>{companyPhone}</strong>
-                    </div>
-                  </div>
-                )}
-                {companyDocument && (
-                  <div className="bw-contact-item">
-                    <Building2 size={16} />
-                    <div>
-                      <small>Razão Social</small>
-                      <strong>{companyName}</strong>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="bw-modal-footer">
-              <button
-                type="button"
-                className="btn secondary"
-                onClick={() => setShowHelpModal(false)}
-              >
-                Fechar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Modal Interativo de Suporte de TI & Abertura de Chamado */}
+      <OpenTicketModal
+        isOpen={showHelpModal}
+        onClose={() => setShowHelpModal(false)}
+        companyName={companyName}
+        companyEmail={companyEmail}
+        companyPhone={companyPhone}
+        companyDocument={companyDocument}
+      />
     </div>
   );
 }

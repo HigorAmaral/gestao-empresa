@@ -155,6 +155,7 @@ export async function executeDatabaseCleanup(): Promise<CleanDatabaseResult> {
 
   await safeDelete("client", () => prisma.client.deleteMany());
   await safeDelete("supplier", () => prisma.supplier.deleteMany());
+  await safeDelete("itTicket", () => (prisma as any).itTicket.deleteMany());
 
   // Tabelas dinâmicas auxiliares (conciliação OFX, notificações)
   try {

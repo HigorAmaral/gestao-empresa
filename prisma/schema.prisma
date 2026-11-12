@@ -698,5 +698,26 @@ model Contract {
   updatedAt            DateTime  @updatedAt
 }
 
+// ---------- Helpdesk & Chamados de Suporte TI ----------
+
+model ItTicket {
+  id             Int       @id @default(autoincrement())
+  ticketNumber   String    @unique
+  requesterName  String
+  requesterEmail String?
+  requesterPhone String?
+  department     String?
+  category       String    @default("OUTRO") // ACESSO_SENHA | SISTEMA_ERRO | EQUIPAMENTO_HARDWARE | REDE_INTERNET | INSTALACAO_SOFTWARE | OUTRO
+  priority       String    @default("NORMAL") // BAIXA | NORMAL | ALTA | URGENTE
+  status         String    @default("ABERTO") // ABERTO | EM_ATENDIMENTO | RESOLVIDO | CANCELADO
+  title          String
+  description    String
+  solutionNotes  String?
+  assignedTo     String?
+  resolvedAt     DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
 
 
