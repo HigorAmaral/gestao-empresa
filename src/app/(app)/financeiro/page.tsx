@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Prisma } from "@prisma/client";
-import { Building2, CalendarRange, MessageCircle, Plus } from "lucide-react";
+import { Building2, CalendarRange, FileUp, MessageCircle, Plus } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
 import { pageParams, spStr } from "@/lib/form";
@@ -136,6 +136,9 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: S
         subtitle="Contas a pagar e receber, saldos bancários, conciliação OFX e fluxo de caixa projetado"
         actions={
           <>
+            <Link className="btn secondary" href="/financeiro/conciliacao" title="Importar Extrato OFX do Banco">
+              <FileUp size={15} /> Conciliação OFX
+            </Link>
             <FinanceToolsModals accounts={bankAccountsSummary} />
             <ExportCsvButton entity="financeiro" />
             <Link className="btn" href="/financeiro/novo?type=RECEITA">

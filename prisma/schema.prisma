@@ -97,6 +97,7 @@ model Client {
   sales         Sale[]
   serviceOrders ServiceOrder[]
   invoices      Invoice[]
+  contracts     Contract[]
 }
 
 model Supplier {
@@ -297,6 +298,8 @@ model Sale {
   notes         String?
   approvedAt    DateTime?
   clientNotes   String?
+  pipelineStage String?  @default("PROPOSTA") // NOVO_LEAD | CONTATO | PROPOSTA | NEGOCIACAO | FECHADO | PERDIDO
+  lossReason    String?
   createdAt     DateTime @default(now())
 
   items     SaleItem[]
@@ -670,5 +673,30 @@ model InvoiceItem {
   cofinsRate  Float   @default(0)
   cofinsValue Float   @default(0)
 }
+
+// ---------- Contratos & Mensalidades Recorrentes (Assinaturas) ----------
+
+model Contract {
+  id                   Int       @id @default(autoincrement())
+  clientId             Int
+  client               Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  title                String    // Ex: "Contrato Suporte e Manutenção TI"
+  description          String?
+  amount               Float     @default(0)
+  recurrence           String    @default("MENSAL") // MENSAL | TRIMESTRAL | SEMESTRAL | ANUAL
+  dueDay               Int       @default(10) // Dia de vencimento (1 a 31)
+  status               String    @default("ATIVO") // ATIVO | PAUSADO | CANCELADO
+  autoGenerateFinEntry Boolean   @default(true)
+  autoGenerateOS       Boolean   @default(false)
+  osServiceDescription String?
+  startDate            DateTime  @default(now())
+  endDate              DateTime?
+  lastBilledAt         DateTime?
+  nextBillingDate      DateTime?
+  notes                String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+}
+
 
 

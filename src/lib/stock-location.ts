@@ -14,7 +14,7 @@ let tablesChecked = false;
  * Com a versão gravada no banco, cada cold start faz apenas 1 consulta rápida
  * em vez de ~90 comandos DDL sequenciais (principal causa de lentidão nas páginas).
  */
-const SCHEMA_VERSION = 14;
+const SCHEMA_VERSION = 15;
 let inflight: Promise<void> | null = null;
 
 export async function ensureStockLocationTables(): Promise<void> {
@@ -60,8 +60,32 @@ async function runSchemaSetup(): Promise<void> {
   if (tablesChecked) return;
 
   try {
-    // Status automático de SST vencidos / colunas novas da versão 14
+    // Status automático de SST vencidos / colunas novas da versão 14 e 15
     await prisma.$executeRawUnsafe(`ALTER TABLE "Employee" ADD COLUMN IF NOT EXISTS "birthDate" TIMESTAMP(3);`).catch(() => {});
+    await prisma.$executeRawUnsafe(`ALTER TABLE "Sale" ADD COLUMN IF NOT EXISTS "pipelineStage" TEXT DEFAULT 'PROPOSTA';`).catch(() => {});
+    await prisma.$executeRawUnsafe(`ALTER TABLE "Sale" ADD COLUMN IF NOT EXISTS "lossReason" TEXT;`).catch(() => {});
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "Contract" (
+        "id" SERIAL PRIMARY KEY,
+        "clientId" INTEGER NOT NULL REFERENCES "Client"("id") ON DELETE CASCADE,
+        "title" TEXT NOT NULL,
+        "description" TEXT,
+        "amount" DOUBLE PRECISION NOT NULL DEFAULT 0,
+        "recurrence" TEXT NOT NULL DEFAULT 'MENSAL',
+        "dueDay" INTEGER NOT NULL DEFAULT 10,
+        "status" TEXT NOT NULL DEFAULT 'ATIVO',
+        "autoGenerateFinEntry" BOOLEAN NOT NULL DEFAULT true,
+        "autoGenerateOS" BOOLEAN NOT NULL DEFAULT false,
+        "osServiceDescription" TEXT,
+        "startDate" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "endDate" TIMESTAMP(3),
+        "lastBilledAt" TIMESTAMP(3),
+        "nextBillingDate" TIMESTAMP(3),
+        "notes" TEXT,
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `).catch(() => {});
     // 1. Cria a tabela StockLocation no PostgreSQL
     await prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS "StockLocation" (

@@ -12,6 +12,7 @@ import {
   Cpu,
   Factory,
   FileText,
+  FileSpreadsheet,
   HeartPulse,
   History,
   LayoutDashboard,
@@ -28,6 +29,7 @@ import {
   ShieldCheck,
   ShoppingCart,
   Sun,
+  TrendingUp,
   Truck,
   User,
   UserCheck,
@@ -63,6 +65,8 @@ const SECTIONS: { title: string; items: Item[] }[] = [
     items: [
       { href: "/pdv", label: "PDV (Frente de Caixa)", Icon: Monitor, moduleKey: "vendas" },
       { href: "/vendas", label: "Vendas", Icon: ShoppingCart, moduleKey: "vendas" },
+      { href: "/vendas/funil", label: "Funil & CRM", Icon: TrendingUp, moduleKey: "vendas", subItem: true },
+      { href: "/contratos", label: "Contratos & Recorrência", Icon: FileSpreadsheet, moduleKey: "vendas" },
       { href: "/nfe", label: "Notas Fiscais (NF-e)", Icon: FileText, moduleKey: "vendas" },
       { href: "/os", label: "Ordens de Serviço", Icon: Wrench, moduleKey: "os", alertKey: "os" },
       { href: "/producao", label: "Produção (OP)", Icon: Factory, moduleKey: "os" },
@@ -85,6 +89,7 @@ const SECTIONS: { title: string; items: Item[] }[] = [
     title: "RH & Depto. Pessoal",
     items: [
       { href: "/funcionarios", label: "Equipe & Prontuários", Icon: UserCheck, moduleKey: "funcionarios" },
+      { href: "/portal-colaborador", label: "Portal do Colaborador", Icon: UserCheck, moduleKey: "funcionarios", subItem: true },
       { href: "/funcionarios/folha", label: "Folha de Pagamento", Icon: Receipt, moduleKey: "funcionarios" },
       { href: "/funcionarios/ponto", label: "Relógio de Ponto (REP)", Icon: Cpu, moduleKey: "funcionarios" },
       { href: "/funcionarios/ferias", label: "Férias & Atestados", Icon: Calendar, moduleKey: "funcionarios" },

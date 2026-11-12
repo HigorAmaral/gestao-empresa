@@ -24,6 +24,8 @@ export function saleWhatsAppMessage(sale: {
   installments?: number;
   clientName?: string | null;
   items?: { name: string; quantity: number; total: number }[];
+  publicUrl?: string | null;
+  pixKey?: string | null;
 }) {
   const greeting = sale.clientName ? `Olá, *${sale.clientName}*!` : "Olá!";
   const tipo = sale.status === "ORCAMENTO" ? "Orçamento" : "Pedido de Venda";
@@ -33,6 +35,8 @@ export function saleWhatsAppMessage(sale: {
       : "";
   const parc = sale.installments && sale.installments > 1 ? ` (${sale.installments}x)` : "";
   const pag = sale.paymentMethod ? `\n*Pagamento:* ${sale.paymentMethod}${parc}` : "";
+  const link = sale.publicUrl ? `\n\n📄 *Acesse seu comprovante e detalhes online:*\n${sale.publicUrl}` : "";
+  const pix = sale.pixKey ? `\n\n🔑 *Chave Pix para pagamento:* ${sale.pixKey}` : "";
 
   return (
     `${greeting}\n` +
@@ -40,7 +44,10 @@ export function saleWhatsAppMessage(sale: {
     itensTxt +
     `\n\n*Total:* ${brl(sale.total)}` +
     pag +
-    `\n*Status:* ${STATUS_LABEL[sale.status] ?? sale.status}\n\nQualquer dúvida, estamos à disposição!`
+    `\n*Status:* ${STATUS_LABEL[sale.status] ?? sale.status}` +
+    link +
+    pix +
+    `\n\nQualquer dúvida, estamos à disposição!`
   );
 }
 
@@ -51,10 +58,14 @@ export function osWhatsAppMessage(os: {
   total: number;
   diagnosis?: string | null;
   clientName?: string | null;
+  publicUrl?: string | null;
+  pixKey?: string | null;
 }) {
   const greeting = os.clientName ? `Olá, *${os.clientName}*!` : "Olá!";
   const statusLbl = STATUS_LABEL[os.status] ?? os.status;
   const diag = os.diagnosis ? `\n*Diagnóstico/Serviço:* ${os.diagnosis}` : "";
+  const link = os.publicUrl ? `\n\n📄 *Acompanhe o laudo técnico completo online:*\n${os.publicUrl}` : "";
+  const pix = os.pixKey ? `\n\n🔑 *Chave Pix para pagamento:* ${os.pixKey}` : "";
 
   return (
     `${greeting}\n` +
@@ -62,7 +73,10 @@ export function osWhatsAppMessage(os: {
     `*Equipamento:* ${os.equipment}\n` +
     `*Status:* ${statusLbl}` +
     diag +
-    `\n*Valor Total:* ${brl(os.total)}\n\nQualquer dúvida, estamos à disposição!`
+    `\n*Valor Total:* ${brl(os.total)}` +
+    link +
+    pix +
+    `\n\nQualquer dúvida, estamos à disposição!`
   );
 }
 
@@ -71,13 +85,16 @@ export function financialWhatsAppMessage(entry: {
   amount: number;
   dueDate: Date | string;
   clientName?: string | null;
+  pixKey?: string | null;
 }) {
   const greeting = entry.clientName ? `Olá, *${entry.clientName}*!` : "Olá!";
+  const pix = entry.pixKey ? `\n🔑 *Chave Pix:* ${entry.pixKey}` : "";
   return (
     `${greeting}\n` +
     `Lembrete referente ao título *${entry.description}*:\n` +
     `*Vencimento:* ${fmtDate(entry.dueDate)}\n` +
-    `*Valor:* ${brl(entry.amount)}\n\n` +
-    `Caso já tenha efetuado o pagamento, por favor desconsidere esta mensagem.`
+    `*Valor:* ${brl(entry.amount)}` +
+    pix +
+    `\n\nCaso já tenha efetuado o pagamento, por favor desconsidere esta mensagem.`
   );
 }

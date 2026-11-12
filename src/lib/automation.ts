@@ -202,6 +202,78 @@ export async function runSystemAutomations(options?: { forcePayroll?: boolean })
     console.error("Erro ao verificar OS atrasadas:", err);
   }
 
+  // 6. Automação de Contratos & Mensalidades Recorrentes
+  let billedContractsCount = 0;
+  try {
+    const dueContracts = await prisma.contract.findMany({
+      where: {
+        status: "ATIVO",
+        OR: [
+          { nextBillingDate: { lte: today } },
+          { nextBillingDate: null },
+        ],
+      },
+      include: { client: true },
+    });
+
+    for (const c of dueContracts) {
+      const existing = await prisma.financialEntry.findFirst({
+        where: {
+          category: "Contratos / Assinaturas",
+          description: { contains: `Contrato #${c.id}` },
+          dueDate: {
+            gte: new Date(Date.UTC(curY, curM - 1, 1)),
+            lte: new Date(Date.UTC(curY, curM, 0, 23, 59, 59)),
+          },
+        },
+      });
+
+      if (!existing) {
+        if (c.autoGenerateFinEntry) {
+          const dueDay = Math.min(28, c.dueDay);
+          await prisma.financialEntry.create({
+            data: {
+              type: "RECEITA",
+              description: `Mensalidade Contrato #${c.id} — ${c.title} (${curLabel})`,
+              category: "Contratos / Assinaturas",
+              amount: c.amount,
+              dueDate: new Date(Date.UTC(curY, curM - 1, dueDay)),
+              status: "PENDENTE",
+              notes: `Cliente: ${c.client.name} | Gerado automaticamente pela rotina de contratos`,
+            },
+          });
+        }
+
+        if (c.autoGenerateOS) {
+          await prisma.serviceOrder.create({
+            data: {
+              clientId: c.clientId,
+              equipment: `Contrato: ${c.title}`,
+              status: "ABERTA",
+              reportedIssue: c.osServiceDescription || `Manutenção periódica automática contrato #${c.id}`,
+              laborCost: c.amount,
+              total: c.amount,
+              notes: `OS periódica automática (${curLabel})`,
+            },
+          });
+        }
+
+        const next = new Date(c.nextBillingDate || today);
+        next.setMonth(next.getMonth() + 1);
+        await prisma.contract.update({
+          where: { id: c.id },
+          data: {
+            lastBilledAt: today,
+            nextBillingDate: next,
+          },
+        });
+        billedContractsCount++;
+      }
+    }
+  } catch (err) {
+    console.error("Erro na automação de contratos recorrentes:", err);
+  }
+
   // Montagem do resumo executivo das ações realizadas
   const summary: string[] = [];
 
@@ -209,6 +281,12 @@ export async function runSystemAutomations(options?: { forcePayroll?: boolean })
     summary.push(`${recurrentGenerated} despesa(s) recorrente(s) fixas projetadas no Financeiro.`);
   } else {
     summary.push(`Despesas fixas recorrentes: todas as despesas deste mês (${curLabel}) já estavam lançadas.`);
+  }
+
+  if (billedContractsCount > 0) {
+    summary.push(`${billedContractsCount} mensalidade(s) de contrato(s) faturada(s) automaticamente.`);
+  } else {
+    summary.push("Contratos recorrentes: todas as mensalidades vigentes verificadas.");
   }
 
   if (lowStockOrders > 0) {
@@ -238,6 +316,7 @@ export async function runSystemAutomations(options?: { forcePayroll?: boolean })
   revalidatePath("/compras");
   revalidatePath("/estoque");
   revalidatePath("/funcionarios/folha");
+  revalidatePath("/contratos");
 
   return {
     timestamp: new Date().toISOString(),

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Prisma } from "@prisma/client";
-import { Plus, Printer } from "lucide-react";
+import { Plus, Printer, TrendingUp } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { pageParams, spStr } from "@/lib/form";
 import { brl, fmtDate } from "@/lib/format";
@@ -48,6 +48,9 @@ export default async function VendasPage({ searchParams }: { searchParams: SP })
         subtitle="Orçamentos e pedidos de venda"
         actions={
           <>
+            <Link className="btn secondary" href="/vendas/funil" title="Visualizar Funil Kanban & CRM">
+              <TrendingUp size={15} /> Funil & CRM
+            </Link>
             <ExportCsvButton entity="vendas" />
             <Link className="btn" href="/vendas/novo">
               <Plus size={15} /> Nova venda

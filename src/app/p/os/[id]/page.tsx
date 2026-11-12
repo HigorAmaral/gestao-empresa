@@ -8,6 +8,7 @@ import { verifyPublicToken } from "@/lib/public-token";
 import { ensureStockLocationTables } from "@/lib/stock-location";
 import { PrintButton } from "@/components/PrintButton";
 import { StatusBadge } from "@/components/ui";
+import { PixQrBox } from "@/components/PixQrBox";
 import { approvePublicOsAction } from "../../actions";
 
 type Params = Promise<{ id: string }>;
@@ -170,6 +171,18 @@ export default async function PublicOsApprovalPage({
             </div>
             <div style={{ fontSize: 17, fontWeight: 800 }}>TOTAL DA OS: {brl(os.total)}</div>
           </div>
+
+          {company.pixKey && os.total > 0 && (
+            <div style={{ marginTop: 16 }}>
+              <PixQrBox
+                pixKey={company.pixKey}
+                merchantName={company.tradeName || company.name}
+                merchantCity={company.city || "SAO PAULO"}
+                amount={os.total}
+                txid={`OS${os.id}`}
+              />
+            </div>
+          )}
         </div>
 
         {!isApproved && os.status !== "CANCELADA" && (

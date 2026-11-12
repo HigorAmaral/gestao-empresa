@@ -4,6 +4,7 @@ import { spStr } from "@/lib/form";
 import { brl, num, todayInput } from "@/lib/format";
 import { HBarList, PageHeader } from "@/components/ui";
 import { PrintButton } from "@/components/PrintButton";
+import { MonthlyFinanceChart, AbcCurveCard, type AbcProductRow } from "@/components/BiCharts";
 
 type SP = Promise<Record<string, string | string[] | undefined>>;
 
@@ -20,7 +21,7 @@ export default async function RelatoriosPage({ searchParams }: { searchParams: S
     lte: new Date(to + "T23:59:59.999Z"),
   };
 
-  const [sales, saleItems, serviceOrders, invoices, entries, purchases] = await Promise.all([
+  const [sales, saleItems, serviceOrders, invoices, entries, purchases, sixMonthsEntries] = await Promise.all([
     prisma.sale.findMany({
       where: { status: "CONFIRMADA", date: dateRange },
       include: { client: true, user: true },
@@ -44,6 +45,15 @@ export default async function RelatoriosPage({ searchParams }: { searchParams: S
       where: { status: "RECEBIDA", date: dateRange },
       _sum: { total: true },
       _count: true,
+    }),
+    prisma.financialEntry.findMany({
+      where: {
+        status: "PAGO",
+        dueDate: {
+          gte: new Date(Date.now() - 180 * 86400000),
+        },
+      },
+      select: { type: true, amount: true, dueDate: true },
     }),
   ]);
 
@@ -113,6 +123,71 @@ export default async function RelatoriosPage({ searchParams }: { searchParams: S
     .sort((a, b) => b.total - a.total)
     .slice(0, 10);
 
+  // Evolução últimos 6 meses (Receitas vs Despesas)
+  const monthMap = new Map<string, { receitas: number; despesas: number }>();
+  const now = new Date();
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
+    const key = `${String(d.getUTCMonth() + 1).padStart(2, "0")}/${d.getUTCFullYear()}`;
+    monthMap.set(key, { receitas: 0, despesas: 0 });
+  }
+
+  for (const e of sixMonthsEntries) {
+    const key = `${String(e.dueDate.getUTCMonth() + 1).padStart(2, "0")}/${e.dueDate.getUTCFullYear()}`;
+    if (monthMap.has(key)) {
+      const cur = monthMap.get(key)!;
+      if (e.type === "RECEITA") cur.receitas += e.amount;
+      else cur.despesas += e.amount;
+    }
+  }
+
+  const monthlyChartData = [...monthMap.entries()].map(([month, vals]) => ({
+    month,
+    receitas: Math.round(vals.receitas * 100) / 100,
+    despesas: Math.round(vals.despesas * 100) / 100,
+    lucro: Math.round((vals.receitas - vals.despesas) * 100) / 100,
+  }));
+
+  // Curva ABC de Produtos
+  const abcMap = new Map<number, { productId: number; name: string; sku: string; category: string; quantitySold: number; totalRevenue: number }>();
+  for (const it of saleItems) {
+    const cur = abcMap.get(it.productId) ?? {
+      productId: it.productId,
+      name: it.product.name,
+      sku: it.product.sku,
+      category: it.product.category || "Geral",
+      quantitySold: 0,
+      totalRevenue: 0,
+    };
+    cur.quantitySold += it.quantity;
+    cur.totalRevenue += it.total;
+    abcMap.set(it.productId, cur);
+  }
+
+  const sortedAbc = [...abcMap.values()].sort((a, b) => b.totalRevenue - a.totalRevenue);
+  const totalAbcRev = sortedAbc.reduce((s, i) => s + i.totalRevenue, 0);
+
+  let runningAccum = 0;
+  const abcItems: AbcProductRow[] = sortedAbc.map((item) => {
+    runningAccum += item.totalRevenue;
+    const sharePct = totalAbcRev > 0 ? (item.totalRevenue / totalAbcRev) * 100 : 0;
+    const accumPct = totalAbcRev > 0 ? (runningAccum / totalAbcRev) * 100 : 0;
+
+    let classification: "A" | "B" | "C" = "C";
+    if (accumPct <= 80 || accumPct - sharePct < 80) {
+      classification = "A";
+    } else if (accumPct <= 95) {
+      classification = "B";
+    }
+
+    return {
+      ...item,
+      sharePct,
+      accumPct,
+      classification,
+    };
+  });
+
   return (
     <>
       <PageHeader
@@ -155,6 +230,9 @@ export default async function RelatoriosPage({ searchParams }: { searchParams: S
           <div className="hint">margem líq. {num(netSales ? (netProfit / netSales) * 100 : 0, 1)}%</div>
         </div>
       </div>
+
+      {/* Gráfico Visual de Evolução Financeira */}
+      <MonthlyFinanceChart data={monthlyChartData} />
 
       <div className="grid grid-2">
         <div className="card flush">
@@ -258,6 +336,11 @@ export default async function RelatoriosPage({ searchParams }: { searchParams: S
             format={(v) => brl(v)}
           />
         </div>
+      </div>
+
+      {/* Curva ABC de Produtos (Princípio de Pareto 80/20) */}
+      <div className="mt">
+        <AbcCurveCard items={abcItems} />
       </div>
 
       <div className="grid grid-2 mt">

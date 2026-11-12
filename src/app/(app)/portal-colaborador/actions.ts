@@ -1,0 +1,41 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { prisma } from "@/lib/prisma";
+import { requireUser } from "@/lib/auth";
+import { logAudit } from "@/lib/audit";
+
+export async function requestVacationAction(formData: FormData) {
+  const user = await requireUser();
+
+  const employeeId = Number(formData.get("employeeId"));
+  const startDateStr = formData.get("startDate") as string;
+  const days = Number(formData.get("days")) || 30;
+  const notes = (formData.get("notes") as string)?.trim() || "";
+
+  if (!employeeId || !startDateStr || days < 5 || days > 30) {
+    throw new Error("Informe a data de início e quantidade válida de dias (entre 5 e 30 dias).");
+  }
+
+  const startDate = new Date(startDateStr);
+  const returnDate = new Date(startDate.getTime() + days * 86400000);
+
+  const leave = await prisma.employeeLeave.create({
+    data: {
+      employeeId,
+      type: "FERIAS",
+      startDate,
+      endDate: returnDate,
+      days,
+      status: "PROGRAMADA",
+      notes: notes
+        ? `[SOLICITACAO_DO_COLABORADOR]: ${notes}`
+        : "[SOLICITACAO_DO_COLABORADOR]: Solicitado via Portal do Colaborador",
+    },
+  });
+
+  await logAudit(user, "RH", "SOLICITAR_FERIAS", `Colaborador solicitou ${days} dias de férias`, leave.id);
+
+  revalidatePath("/portal-colaborador");
+  revalidatePath("/funcionarios/ferias");
+}
