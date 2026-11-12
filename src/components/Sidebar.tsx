@@ -6,6 +6,8 @@ import { useEffect, useState } from "react";
 import {
   BarChart3,
   Building2,
+  ChevronLeft,
+  ChevronRight,
   Factory,
   FileText,
   History,
@@ -105,12 +107,18 @@ export function Sidebar({
   const isAdmin = session.role === "ADMIN";
   const [dark, setDark] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem("theme");
     if (saved === "dark") {
       document.documentElement.setAttribute("data-theme", "dark");
       setDark(true);
+    }
+    const savedCollapsed = localStorage.getItem("sidebar_collapsed");
+    if (savedCollapsed === "true" && window.innerWidth > 800) {
+      setCollapsed(true);
+      document.body.classList.add("sidebar-collapsed");
     }
   }, []);
 
@@ -129,6 +137,32 @@ export function Sidebar({
       document.documentElement.removeAttribute("data-theme");
       localStorage.setItem("theme", "light");
     }
+  }
+
+  function handleCollapse() {
+    if (typeof window !== "undefined" && window.innerWidth <= 800) {
+      setDrawerOpen(false);
+      return;
+    }
+    const next = !collapsed;
+    setCollapsed(next);
+    if (next) {
+      document.body.classList.add("sidebar-collapsed");
+      localStorage.setItem("sidebar_collapsed", "true");
+    } else {
+      document.body.classList.remove("sidebar-collapsed");
+      localStorage.setItem("sidebar_collapsed", "false");
+    }
+  }
+
+  function handleExpand() {
+    if (typeof window !== "undefined" && window.innerWidth <= 800) {
+      setDrawerOpen(true);
+      return;
+    }
+    setCollapsed(false);
+    document.body.classList.remove("sidebar-collapsed");
+    localStorage.setItem("sidebar_collapsed", "false");
   }
 
   const allHrefs = SECTIONS.flatMap((s) => s.items.map((i) => i.href));
@@ -249,15 +283,26 @@ export function Sidebar({
             </button>
             <button
               type="button"
-              className="theme-btn mobile-close-btn"
-              onClick={() => setDrawerOpen(false)}
-              aria-label="Fechar menu"
-              title="Fechar menu lateral"
+              className="theme-btn sidebar-close-btn"
+              onClick={handleCollapse}
+              aria-label="Recolher menu lateral"
+              title="Recolher menu lateral (X)"
             >
               <X size={16} />
             </button>
           </div>
         </div>
+
+        {/* Botão de seta retrátil no meio da lateral da barra quando aberta */}
+        <button
+          type="button"
+          className="sidebar-edge-toggle no-print"
+          onClick={handleCollapse}
+          title="Recolher menu lateral"
+          aria-label="Recolher menu lateral"
+        >
+          <ChevronLeft size={15} strokeWidth={2.4} />
+        </button>
 
         {/* Busca Global Instantânea (Ctrl + K) */}
         <div style={{ padding: "10px 12px 2px" }}>
@@ -309,6 +354,19 @@ export function Sidebar({
           <PwaInstallButton />
         </div>
       </aside>
+
+      {/* Seta no meio da lateral para reabrir / expandir a barra */}
+      {collapsed && (
+        <button
+          type="button"
+          className="sidebar-expand-tab no-print"
+          onClick={handleExpand}
+          title="Expandir menu lateral"
+          aria-label="Expandir menu lateral"
+        >
+          <ChevronRight size={18} strokeWidth={2.5} />
+        </button>
+      )}
 
       {/* Barra Fixa Inferior Estilo App Nativo (visível apenas no celular) */}
       <nav className="mobile-bottom-nav no-print">
