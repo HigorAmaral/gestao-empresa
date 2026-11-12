@@ -8,7 +8,6 @@ import { saveCompanySettings } from "./actions";
 import { LogoUploadField } from "./LogoUploadField";
 import { ColorThemeCustomizer } from "./ColorThemeCustomizer";
 import { CompanyFiscalLookupFields } from "./CompanyFiscalLookupFields";
-import { ResetDatabaseSection } from "./ResetDatabaseSection";
 
 export default async function ConfiguracoesPage() {
   await requireAdmin("configuracoes");
@@ -112,8 +111,6 @@ export default async function ConfiguracoesPage() {
           </a>
         </div>
       </div>
-
-      <ResetDatabaseSection />
     </>
   );
 }

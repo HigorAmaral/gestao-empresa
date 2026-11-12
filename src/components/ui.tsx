@@ -1,7 +1,8 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, Download } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download } from "lucide-react";
 import { STATUS_LABEL } from "@/lib/format";
+import { AlertToast } from "./AlertToast";
 
 export function PageHeader({
   title,
@@ -32,22 +33,18 @@ export function ExportCsvButton({ entity, label = "Exportar CSV" }: { entity: st
   );
 }
 
-/** Mostra mensagens ?erro= e ?ok= vindas de redirects. */
+/** Mostra mensagens ?erro= e ?ok= vindas de redirects como alertas flutuantes no lado direito. */
 export function FlashMessages({ sp }: { sp: Record<string, string | string[] | undefined> }) {
   const erro = typeof sp.erro === "string" ? sp.erro : null;
   const ok = typeof sp.ok === "string" ? sp.ok : null;
+  const aviso = typeof sp.aviso === "string" ? sp.aviso : null;
+  const info = typeof sp.info === "string" ? sp.info : null;
   return (
     <>
-      {erro && (
-        <div className="alert error" role="alert" aria-live="assertive">
-          <AlertCircle size={17} aria-hidden="true" /> {erro}
-        </div>
-      )}
-      {ok && (
-        <div className="alert success" role="status" aria-live="polite">
-          <CheckCircle2 size={17} aria-hidden="true" /> {ok}
-        </div>
-      )}
+      {erro && <AlertToast type="error" message={erro} />}
+      {ok && <AlertToast type="success" message={ok} />}
+      {aviso && <AlertToast type="warning" message={aviso} />}
+      {info && <AlertToast type="info" message={info} />}
     </>
   );
 }

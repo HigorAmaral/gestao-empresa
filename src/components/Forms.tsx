@@ -1,8 +1,9 @@
 "use client";
 
-import { startTransition, useActionState, useEffect, useRef, type ReactNode } from "react";
+import { startTransition, useActionState, useEffect, useRef, useState, type ReactNode } from "react";
 import { useFormStatus } from "react-dom";
 import type { FormState } from "@/lib/form";
+import { AlertToast } from "./AlertToast";
 
 /**
  * Formulário ligado a uma server action que retorna { error } / { success }.
@@ -22,6 +23,7 @@ export function ActionForm({
   resetOnSuccess?: boolean;
 }) {
   const [state, formAction, pending] = useActionState(action, undefined);
+  const [submitCount, setSubmitCount] = useState(0);
   const ref = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
@@ -34,11 +36,12 @@ export function ActionForm({
       onSubmit={(e) => {
         e.preventDefault();
         const fd = new FormData(e.currentTarget);
+        setSubmitCount((c) => c + 1);
         startTransition(() => formAction(fd));
       }}
     >
-      {state?.error && <div className="alert error">{state.error}</div>}
-      {state?.success && <div className="alert success">{state.success}</div>}
+      {state?.error && <AlertToast type="error" message={state.error} triggerKey={submitCount} />}
+      {state?.success && <AlertToast type="success" message={state.success} triggerKey={submitCount} />}
       {children}
       <div className="form-actions">
         {extraActions}

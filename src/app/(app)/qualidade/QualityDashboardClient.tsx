@@ -14,6 +14,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { fmtDate } from "@/lib/format";
+import { AlertToast } from "@/components/AlertToast";
 import {
   QUALITY_STATUS_LABEL,
   QUALITY_TYPES,
@@ -220,21 +221,10 @@ export function QualityDashboardClient({
   return (
     <div>
       {feedback && (
-        <div
-          className={`alert ${feedback.type === "ok" ? "success" : "error"} mb row between`}
-          role={feedback.type === "error" ? "alert" : "status"}
-          aria-live="polite"
-        >
-          <span>{feedback.text}</span>
-          <button
-            type="button"
-            className="btn sm secondary"
-            onClick={() => setFeedback(null)}
-            aria-label="Fechar mensagem"
-          >
-            <X size={13} />
-          </button>
-        </div>
+        <AlertToast
+          type={feedback.type === "ok" ? "success" : "error"}
+          message={feedback.text}
+        />
       )}
 
       {/* Barra de Abas + Ações */}
