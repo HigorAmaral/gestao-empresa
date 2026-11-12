@@ -166,3 +166,84 @@ export async function deleteAssetAction(fd: FormData) {
   revalidatePath("/suporte-ti");
   return { success: true };
 }
+
+export async function blockIpRuleAction(fd: FormData) {
+  const session = await getSession();
+  if (!session || (session.role !== "ADMIN" && !session.permissions?.includes("ti"))) {
+    throw new Error("Não autorizado.");
+  }
+
+  const ip = String(fd.get("ip") || "").trim();
+  const reason = String(fd.get("reason") || "Bloqueio manual pela equipe de TI").trim();
+  const duration = Number(fd.get("duration") || 0);
+
+  if (!ip) throw new Error("Informe o endereço IP.");
+
+  const { blockIp } = await import("@/lib/security");
+  await blockIp(ip, reason, duration > 0 ? duration : undefined);
+
+  await logAudit(
+    session,
+    "TI_SEGURANCA",
+    "BLOQUEAR_IP",
+    `IP ${ip} inserido na lista de bloqueio (Motivo: ${reason})`,
+    ip
+  );
+
+  revalidatePath("/suporte-ti");
+  return { success: true };
+}
+
+export async function unblockIpRuleAction(fd: FormData) {
+  const session = await getSession();
+  if (!session || (session.role !== "ADMIN" && !session.permissions?.includes("ti"))) {
+    throw new Error("Não autorizado.");
+  }
+
+  const ip = String(fd.get("ip") || "").trim();
+  if (!ip) throw new Error("Informe o endereço IP.");
+
+  const { unblockIp } = await import("@/lib/security");
+  await unblockIp(ip);
+
+  await logAudit(
+    session,
+    "TI_SEGURANCA",
+    "DESBLOQUEAR_IP",
+    `IP ${ip} removido da lista de bloqueios pela equipe de TI`,
+    ip
+  );
+
+  revalidatePath("/suporte-ti");
+  return { success: true };
+}
+
+export async function testWafRuleAction(fd: FormData) {
+  const session = await getSession();
+  if (!session) throw new Error("Não autorizado.");
+
+  const payload = String(fd.get("payload") || "").trim();
+  const { inspectRequest, logSecurityIncident } = await import("@/lib/security");
+
+  const result = inspectRequest("/api/test", payload, "ManualSecurityTester/1.0");
+
+  if (result.blocked) {
+    await logSecurityIncident({
+      ip: "127.0.0.1",
+      eventType: result.eventType || "TEST_ATTACK",
+      severity: result.severity || "MEDIUM",
+      endpoint: "/api/test",
+      method: "POST",
+      details: `Teste manual de penetração/WAF executado por ${session.name}: "${payload}" interceptado com sucesso.`,
+      blocked: true,
+    });
+  }
+
+  revalidatePath("/suporte-ti");
+  return {
+    blocked: result.blocked,
+    reason: result.reason,
+    eventType: result.eventType,
+    severity: result.severity,
+  };
+}

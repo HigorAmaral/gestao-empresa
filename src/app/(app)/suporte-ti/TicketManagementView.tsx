@@ -5,6 +5,7 @@ import {
   Activity,
   AlertCircle,
   AlertTriangle,
+  Ban,
   BookOpen,
   Building2,
   Calendar,
@@ -25,6 +26,7 @@ import {
   Lock,
   MessageSquare,
   Phone,
+  Play,
   Plus,
   Printer,
   RefreshCw,
@@ -32,6 +34,7 @@ import {
   Send,
   Server,
   Shield,
+  ShieldAlert,
   ShieldCheck,
   Ticket,
   Trash2,
@@ -41,7 +44,14 @@ import {
   Wrench,
   X,
 } from "lucide-react";
-import { updateTicketStatusAction, deleteTicketAction, deleteAssetAction } from "./actions";
+import {
+  updateTicketStatusAction,
+  deleteTicketAction,
+  deleteAssetAction,
+  blockIpRuleAction,
+  unblockIpRuleAction,
+  testWafRuleAction,
+} from "./actions";
 import { NewAssetModal } from "./NewAssetModal";
 import { NewInternalTicketModal } from "./NewInternalTicketModal";
 
@@ -91,6 +101,42 @@ export interface HealthMetrics {
   environment: string;
 }
 
+export interface SecurityEventItem {
+  id: number;
+  ip: string;
+  eventType: string;
+  severity: string;
+  endpoint: string;
+  method: string;
+  userAgent?: string | null;
+  details: string;
+  blocked: boolean;
+  createdAt: string | Date;
+}
+
+export interface SecurityIpRuleItem {
+  id: number;
+  ip: string;
+  ruleType: string;
+  reason: string;
+  offenses: number;
+  expiresAt?: string | Date | null;
+  active: boolean;
+  createdAt: string | Date;
+}
+
+export interface SecurityData {
+  securityScore: number;
+  totalEventsCount: number;
+  activeBlocksCount: number;
+  events: SecurityEventItem[];
+  rules: SecurityIpRuleItem[];
+  wafStatus: string;
+  antiDdosStatus: string;
+  bruteForceShieldStatus: string;
+  headerShieldStatus: string;
+}
+
 export interface TicketMetrics {
   total: number;
   open: number;
@@ -102,6 +148,7 @@ export function TicketManagementView({
   initialTickets,
   assets,
   health,
+  securityData,
   metrics,
   userName,
   isAdmin,
@@ -110,15 +157,26 @@ export function TicketManagementView({
   initialTickets: TicketItem[];
   assets: AssetItem[];
   health: HealthMetrics;
+  securityData?: SecurityData;
   metrics: TicketMetrics;
   userName: string;
   isAdmin: boolean;
   initialTab?: string;
 }) {
-  const [activeTab, setActiveTab] = useState<"chamados" | "ativos" | "infra" | "kb">(
+  const [activeTab, setActiveTab] = useState<"chamados" | "seguranca" | "ativos" | "infra" | "kb">(
     (initialTab as any) || "chamados"
   );
   const [viewMode, setViewMode] = useState<"lista" | "kanban">("lista");
+
+  // Estado do Simulador de WAF
+  const [testPayload, setTestPayload] = useState("' OR '1'='1' --");
+  const [testResult, setTestResult] = useState<{
+    blocked: boolean;
+    reason?: string;
+    eventType?: string;
+    severity?: string;
+  } | null>(null);
+  const [isTestingWaf, setIsTestingWaf] = useState(false);
 
   // Filtros
   const [searchTerm, setSearchTerm] = useState("");
@@ -280,6 +338,28 @@ export function TicketManagementView({
             }}
           >
             <Ticket size={16} /> Central de Chamados ({metrics.open} abertos)
+          </button>
+
+          <button
+            type="button"
+            className={`btn-tab ${activeTab === "seguranca" ? "active" : ""}`}
+            onClick={() => setActiveTab("seguranca")}
+            style={{
+              padding: "14px 20px",
+              background: activeTab === "seguranca" ? "var(--card-bg)" : "transparent",
+              border: "none",
+              borderBottom: activeTab === "seguranca" ? "3px solid #000000" : "3px solid transparent",
+              fontWeight: 700,
+              cursor: "pointer",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+              fontSize: 13.5,
+              color: activeTab === "seguranca" ? "var(--text)" : "var(--muted)",
+              whiteSpace: "nowrap",
+            }}
+          >
+            <ShieldAlert size={16} /> Segurança & WAF ({securityData?.activeBlocksCount ?? 0} bloqueios)
           </button>
 
           <button
@@ -715,7 +795,336 @@ export function TicketManagementView({
       )}
 
       {/* ====================================================
-          ABA 2: INVENTÁRIO DE ATIVOS & EQUIPAMENTOS DE TI
+          ABA 2: SEGURANÇA CIBERNÉTICA, WAF & DEFESA CONTRA INVASÕES
+          ==================================================== */}
+      {activeTab === "seguranca" && (
+        <div>
+          {/* Métricas e Postura de Cibersegurança */}
+          <div className="grid col-4 mb">
+            <div className="card" style={{ borderLeft: "4px solid #10b981" }}>
+              <span className="muted small" style={{ fontWeight: 600 }}>Pontuação de Cibersegurança</span>
+              <div style={{ fontSize: 28, fontWeight: 900, marginTop: 4, display: "flex", alignItems: "baseline", gap: 6 }}>
+                {securityData?.securityScore ?? 98}<span style={{ fontSize: 14, color: "var(--muted)", fontWeight: 500 }}>/ 100</span>
+              </div>
+              <span className="badge success mt-xs" style={{ width: "fit-content" }}>Escudo Total Ativo</span>
+            </div>
+
+            <div className="card" style={{ borderLeft: "4px solid #000000" }}>
+              <span className="muted small" style={{ fontWeight: 600 }}>Firewall de Aplicação (WAF)</span>
+              <div style={{ fontSize: 15, fontWeight: 800, marginTop: 8 }}>
+                {securityData?.wafStatus || "ATIVO (Modo IPS)"}
+              </div>
+              <span className="badge neutral mt-xs" style={{ width: "fit-content" }}>SQLi, XSS, RCE Bloqueados</span>
+            </div>
+
+            <div className="card" style={{ borderLeft: "4px solid #2563eb" }}>
+              <span className="muted small" style={{ fontWeight: 600 }}>Proteção Força Bruta & Flood</span>
+              <div style={{ fontSize: 15, fontWeight: 800, marginTop: 8 }}>
+                {securityData?.bruteForceShieldStatus || "ATIVO (5 Tentativas)"}
+              </div>
+              <span className="badge info mt-xs" style={{ width: "fit-content" }}>Lockout de 15 Minutos</span>
+            </div>
+
+            <div className="card" style={{ borderLeft: "4px solid #ef4444" }}>
+              <span className="muted small" style={{ fontWeight: 600 }}>IPs Bloqueados no Firewall</span>
+              <div style={{ fontSize: 28, fontWeight: 900, marginTop: 4 }}>
+                {securityData?.activeBlocksCount ?? 0}
+              </div>
+              <span className="badge danger mt-xs" style={{ width: "fit-content" }}>Ameaças Neutras</span>
+            </div>
+          </div>
+
+          <div className="grid col-2 mb">
+            {/* Gerenciamento de Regras do Firewall de IP */}
+            <div className="card">
+              <div className="card-header" style={{ marginBottom: 12 }}>
+                <h2>
+                  <Ban size={18} /> Bloquear Endereço IP Manualmente
+                </h2>
+                <span className="badge neutral">Firewall Layer 7</span>
+              </div>
+              <p className="small muted mb">
+                Bloqueie instantaneamente qualquer endereço IP suspeito de varreduras ou tentativas de intrusão. O IP bloqueado receberá resposta HTTP 403 imediata com tela de interceptação.
+              </p>
+
+              <form action={async (fd) => {
+                await blockIpRuleAction(fd);
+                alert("IP bloqueado com sucesso pelo firewall!");
+              }}>
+                <div className="form-group mb-sm">
+                  <label className="label">Endereço IP para Bloqueio *</label>
+                  <input
+                    type="text"
+                    name="ip"
+                    placeholder="ex: 185.220.101.5 ou 45.154.255.80"
+                    required
+                    className="input"
+                  />
+                </div>
+                <div className="form-group mb-sm">
+                  <label className="label">Motivo do Bloqueio *</label>
+                  <input
+                    type="text"
+                    name="reason"
+                    placeholder="ex: Tentativas repetidas de força bruta ou port scanning"
+                    defaultValue="Bloqueio manual por suspeita de intrusão"
+                    required
+                    className="input"
+                  />
+                </div>
+                <div className="form-group mb">
+                  <label className="label">Duração da Suspensão</label>
+                  <select name="duration" className="input" defaultValue="0">
+                    <option value="60">1 Hora (Temporário)</option>
+                    <option value="1440">24 Horas (1 Dia)</option>
+                    <option value="10080">7 Dias</option>
+                    <option value="0">Permanente (Até remoção manual)</option>
+                  </select>
+                </div>
+                <button type="submit" className="btn btn-danger" style={{ width: "100%", justifyContent: "center" }}>
+                  <Ban size={16} /> Bloquear IP Imediatamente
+                </button>
+              </form>
+            </div>
+
+            {/* Simulador de Ataques / Teste do WAF */}
+            <div className="card">
+              <div className="card-header" style={{ marginBottom: 12 }}>
+                <h2>
+                  <ShieldCheck size={18} /> Teste Interativo de Eficácia do WAF
+                </h2>
+                <span className="badge success">Modo Diagnóstico</span>
+              </div>
+              <p className="small muted mb">
+                Teste as regras de filtragem contra SQL Injection, scripts XSS ou travessia de arquivos. O sistema interceptará o payload e registrará a eficácia em tempo real sem riscos.
+              </p>
+
+              <div className="form-group mb-sm">
+                <label className="label">Carga / Payload de Teste</label>
+                <input
+                  type="text"
+                  value={testPayload}
+                  onChange={(e) => setTestPayload(e.target.value)}
+                  placeholder="ex: ' OR '1'='1 ou <script>alert(1)</script>"
+                  className="input"
+                />
+              </div>
+
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-secondary"
+                  onClick={() => setTestPayload("' OR '1'='1' --")}
+                >
+                  SQLi Básico
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-secondary"
+                  onClick={() => setTestPayload("UNION SELECT username, password FROM users")}
+                >
+                  SQLi Union
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-secondary"
+                  onClick={() => setTestPayload("<script>alert(document.cookie)</script>")}
+                >
+                  XSS Injection
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-secondary"
+                  onClick={() => setTestPayload("../../../../etc/passwd")}
+                >
+                  Path Traversal
+                </button>
+              </div>
+
+              <button
+                type="button"
+                className="btn btn-primary"
+                style={{ width: "100%", justifyContent: "center" }}
+                disabled={isTestingWaf || !testPayload.trim()}
+                onClick={async () => {
+                  setIsTestingWaf(true);
+                  try {
+                    const fd = new FormData();
+                    fd.append("payload", testPayload);
+                    const res = await testWafRuleAction(fd);
+                    setTestResult(res);
+                  } catch (err: any) {
+                    alert("Erro ao executar teste: " + err.message);
+                  } finally {
+                    setIsTestingWaf(false);
+                  }
+                }}
+              >
+                <Play size={16} /> Disparar Teste Contra o Firewall
+              </button>
+
+              {testResult && (
+                <div
+                  className="mt-sm p-sm"
+                  style={{
+                    borderRadius: 8,
+                    background: testResult.blocked ? "rgba(16, 185, 129, 0.1)" : "rgba(239, 68, 68, 0.1)",
+                    border: `1px solid ${testResult.blocked ? "#10b981" : "#ef4444"}`,
+                    fontSize: 13,
+                  }}
+                >
+                  <div style={{ fontWeight: 700, color: testResult.blocked ? "#10b981" : "#ef4444", display: "flex", alignItems: "center", gap: 6 }}>
+                    {testResult.blocked ? "✓ PAYLOAD BLOQUEADO COM SUCESSO!" : "✕ ALERTA: Payload não interceptado"}
+                  </div>
+                  {testResult.blocked && (
+                    <div style={{ marginTop: 6, fontSize: 12, color: "var(--muted)" }}>
+                      <div><strong>Tipo Detectado:</strong> {testResult.eventType}</div>
+                      <div><strong>Regra de Defesa:</strong> {testResult.reason}</div>
+                      <div><strong>Severidade:</strong> {testResult.severity}</div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Tabela de IPs Bloqueados Atualmente */}
+          <div className="card mb">
+            <div className="card-header" style={{ marginBottom: 12 }}>
+              <h2>
+                <Lock size={18} /> Lista Ativa de IPs Bloqueados ({securityData?.rules?.length ?? 0})
+              </h2>
+            </div>
+            {(!securityData?.rules || securityData.rules.length === 0) ? (
+              <p className="muted small" style={{ padding: 12, textAlign: "center" }}>
+                Nenhum endereço IP bloqueado no momento. Todos os nós operando dentro dos parâmetros de normalidade.
+              </p>
+            ) : (
+              <div className="table-responsive">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>IP</th>
+                      <th>Motivo</th>
+                      <th>Ofensas</th>
+                      <th>Expiração</th>
+                      <th>Data de Bloqueio</th>
+                      <th style={{ textAlign: "right" }}>Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {securityData.rules.map((rule) => (
+                      <tr key={rule.id}>
+                        <td style={{ fontWeight: 700, fontFamily: "monospace" }}>{rule.ip}</td>
+                        <td>{rule.reason}</td>
+                        <td><span className="badge danger">{rule.offenses}x</span></td>
+                        <td>{rule.expiresAt ? new Date(rule.expiresAt).toLocaleString("pt-BR") : "Permanente"}</td>
+                        <td>{new Date(rule.createdAt).toLocaleString("pt-BR")}</td>
+                        <td style={{ textAlign: "right" }}>
+                          <form
+                            action={async (fd) => {
+                              if (confirm(`Deseja desbloquear o IP ${rule.ip}?`)) {
+                                await unblockIpRuleAction(fd);
+                              }
+                            }}
+                            style={{ display: "inline" }}
+                          >
+                            <input type="hidden" name="ip" value={rule.ip} />
+                            <button type="submit" className="btn btn-sm btn-secondary">
+                              Desbloquear
+                            </button>
+                          </form>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* Feed de Eventos & Intrusões Interceptadas */}
+          <div className="card">
+            <div className="card-header" style={{ marginBottom: 12 }}>
+              <div>
+                <h2>
+                  <Activity size={18} /> Feed de Incidentes & Tentativas de Invasão Interceptadas
+                </h2>
+                <p className="small muted">
+                  Histórico de ataques SQL Injection, XSS, varreduras automatizadas e bloqueios de força bruta
+                </p>
+              </div>
+              <span className="badge neutral">
+                {securityData?.totalEventsCount ?? 0} eventos registrados
+              </span>
+            </div>
+
+            {(!securityData?.events || securityData.events.length === 0) ? (
+              <div style={{ textAlign: "center", padding: "32px 16px" }}>
+                <ShieldCheck size={36} style={{ color: "#10b981", margin: "0 auto 8px" }} />
+                <p style={{ fontWeight: 600 }}>Nenhum ataque ativo nas últimas 24 horas.</p>
+                <p className="small muted">O WAF e os filtros de segurança estão monitorando todas as portas e requisições HTTP.</p>
+              </div>
+            ) : (
+              <div className="table-responsive">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Horário</th>
+                      <th>Tipo de Ameaça</th>
+                      <th>Severidade</th>
+                      <th>IP de Origem</th>
+                      <th>Rota / Endpoint</th>
+                      <th>Detalhes da Interceptação</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {securityData.events.map((ev) => (
+                      <tr key={ev.id}>
+                        <td style={{ fontSize: 12, whiteSpace: "nowrap" }}>
+                          {new Date(ev.createdAt).toLocaleString("pt-BR")}
+                        </td>
+                        <td>
+                          <span style={{ fontWeight: 600 }}>{ev.eventType}</span>
+                        </td>
+                        <td>
+                          <span
+                            className={`badge ${
+                              ev.severity === "CRITICAL"
+                                ? "danger"
+                                : ev.severity === "HIGH"
+                                ? "warning"
+                                : "info"
+                            }`}
+                          >
+                            {ev.severity}
+                          </span>
+                        </td>
+                        <td style={{ fontFamily: "monospace", fontSize: 12.5 }}>{ev.ip}</td>
+                        <td style={{ fontFamily: "monospace", fontSize: 12, maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {ev.endpoint}
+                        </td>
+                        <td style={{ fontSize: 12.5, maxWidth: 280 }}>
+                          {ev.details}
+                        </td>
+                        <td>
+                          <span className={`badge ${ev.blocked ? "danger" : "neutral"}`}>
+                            {ev.blocked ? "BLOQUEADO" : "REGISTRADO"}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ====================================================
+          ABA 3: INVENTÁRIO DE ATIVOS & EQUIPAMENTOS DE TI
           ==================================================== */}
       {activeTab === "ativos" && (
         <div className="card">

@@ -30,6 +30,7 @@ import {
   Search,
   Server,
   Settings,
+  ShieldAlert,
   ShieldCheck,
   ShoppingCart,
   Sun,
@@ -120,6 +121,7 @@ const SECTIONS: { title: string; items: Item[] }[] = [
     title: "Tecnologia & TI (Reservado)",
     items: [
       { href: "/suporte-ti", label: "Central de Chamados TI", Icon: Headphones, moduleKey: "ti" },
+      { href: "/suporte-ti?tab=seguranca", label: "Segurança & WAF", Icon: ShieldAlert, moduleKey: "ti", subItem: true },
       { href: "/suporte-ti?tab=ativos", label: "Inventário de Ativos", Icon: Laptop, moduleKey: "ti", subItem: true },
       { href: "/suporte-ti?tab=infra", label: "Saúde & Infraestrutura", Icon: Server, moduleKey: "ti", subItem: true },
       { href: "/suporte-ti?tab=kb", label: "Base de Conhecimento", Icon: BookOpen, moduleKey: "ti", subItem: true },

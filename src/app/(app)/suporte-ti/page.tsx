@@ -6,6 +6,7 @@ import {
   getItAssetsList,
   getSystemHealthMetrics,
 } from "@/lib/it-tickets";
+import { getSecurityDashboardData } from "@/lib/security";
 import { TicketManagementView } from "./TicketManagementView";
 import { NewInternalTicketModal } from "./NewInternalTicketModal";
 
@@ -26,10 +27,11 @@ export default async function SuporteTiPage({
   if (!session) redirect("/login");
 
   const params = await searchParams;
-  const [{ tickets, metrics }, assets, health] = await Promise.all([
+  const [{ tickets, metrics }, assets, health, securityData] = await Promise.all([
     getItTicketsList(params),
     getItAssetsList(),
     getSystemHealthMetrics(),
+    getSecurityDashboardData(),
   ]);
 
   const isAdmin = session.role === "ADMIN";
@@ -37,8 +39,8 @@ export default async function SuporteTiPage({
   return (
     <>
       <PageHeader
-        title="Central de Operações de TI & Tecnologia"
-        subtitle="Área reservada para gestão de chamados, inventário de hardware, monitoramento de servidores e base de conhecimento"
+        title="Central de Operações de TI & Cibersegurança"
+        subtitle="Área reservada para gestão de chamados, escudo contra ataques (WAF), inventário de ativos e monitoramento"
         actions={<NewInternalTicketModal userName={session.name} />}
       />
 
@@ -46,6 +48,7 @@ export default async function SuporteTiPage({
         initialTickets={tickets}
         assets={assets}
         health={health}
+        securityData={securityData}
         metrics={metrics}
         userName={session.name}
         isAdmin={isAdmin}

@@ -14,7 +14,7 @@ let tablesChecked = false;
  * Com a versão gravada no banco, cada cold start faz apenas 1 consulta rápida
  * em vez de ~90 comandos DDL sequenciais (principal causa de lentidão nas páginas).
  */
-const SCHEMA_VERSION = 17;
+const SCHEMA_VERSION = 18;
 let inflight: Promise<void> | null = null;
 
 export async function ensureStockLocationTables(): Promise<void> {
@@ -119,6 +119,44 @@ async function runSchemaSetup(): Promise<void> {
         "specifications" TEXT,
         "purchaseDate" TIMESTAMP(3),
         "notes" TEXT,
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `).catch(() => {});
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "SecurityEvent" (
+        "id" SERIAL PRIMARY KEY,
+        "ip" VARCHAR(80) NOT NULL,
+        "eventType" VARCHAR(60) NOT NULL,
+        "severity" VARCHAR(30) NOT NULL DEFAULT 'MEDIUM',
+        "endpoint" TEXT NOT NULL,
+        "method" VARCHAR(20) NOT NULL DEFAULT 'GET',
+        "userAgent" TEXT,
+        "details" TEXT NOT NULL,
+        "blocked" BOOLEAN NOT NULL DEFAULT true,
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `).catch(() => {});
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "SecurityIpRule" (
+        "id" SERIAL PRIMARY KEY,
+        "ip" VARCHAR(80) NOT NULL UNIQUE,
+        "ruleType" VARCHAR(20) NOT NULL DEFAULT 'BLOCK',
+        "reason" TEXT NOT NULL,
+        "offenses" INTEGER NOT NULL DEFAULT 1,
+        "expiresAt" TIMESTAMP(3),
+        "active" BOOLEAN NOT NULL DEFAULT true,
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `).catch(() => {});
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "LoginAttempt" (
+        "id" SERIAL PRIMARY KEY,
+        "identifier" VARCHAR(150) NOT NULL UNIQUE,
+        "attempts" INTEGER NOT NULL DEFAULT 1,
+        "lastFailed" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "lockedUntil" TIMESTAMP(3),
         "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
         "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
       );
@@ -1063,6 +1101,44 @@ async function runSchemaSetup(): Promise<void> {
           "specifications" TEXT,
           "purchaseDate" DATETIME,
           "notes" TEXT,
+          "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+      await prisma.$executeRawUnsafe(`
+        CREATE TABLE IF NOT EXISTS "SecurityEvent" (
+          "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+          "ip" TEXT NOT NULL,
+          "eventType" TEXT NOT NULL,
+          "severity" TEXT NOT NULL DEFAULT 'MEDIUM',
+          "endpoint" TEXT NOT NULL,
+          "method" TEXT NOT NULL DEFAULT 'GET',
+          "userAgent" TEXT,
+          "details" TEXT NOT NULL,
+          "blocked" BOOLEAN NOT NULL DEFAULT 1,
+          "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+      await prisma.$executeRawUnsafe(`
+        CREATE TABLE IF NOT EXISTS "SecurityIpRule" (
+          "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+          "ip" TEXT NOT NULL UNIQUE,
+          "ruleType" TEXT NOT NULL DEFAULT 'BLOCK',
+          "reason" TEXT NOT NULL,
+          "offenses" INTEGER NOT NULL DEFAULT 1,
+          "expiresAt" DATETIME,
+          "active" BOOLEAN NOT NULL DEFAULT 1,
+          "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+      await prisma.$executeRawUnsafe(`
+        CREATE TABLE IF NOT EXISTS "LoginAttempt" (
+          "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+          "identifier" TEXT NOT NULL UNIQUE,
+          "attempts" INTEGER NOT NULL DEFAULT 1,
+          "lastFailed" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          "lockedUntil" DATETIME,
           "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
           "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
         );

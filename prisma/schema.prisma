@@ -737,5 +737,43 @@ model ItAsset {
   updatedAt      DateTime  @updatedAt
 }
 
+// ---------- Segurança & Defesa Cibernética (WAF / IDS / IPS) ----------
+
+model SecurityEvent {
+  id         Int      @id @default(autoincrement())
+  ip         String
+  eventType  String   // SQL_INJECTION | XSS_ATTEMPT | PATH_TRAVERSAL | SCANNER_BOT | BRUTE_FORCE | PROBE_ATTACK | ACCESS_DENIED | RATE_LIMIT
+  severity   String   @default("MEDIUM") // LOW | MEDIUM | HIGH | CRITICAL
+  endpoint   String
+  method     String   @default("GET")
+  userAgent  String?
+  details    String
+  blocked    Boolean  @default(true)
+  createdAt  DateTime @default(now())
+}
+
+model SecurityIpRule {
+  id         Int       @id @default(autoincrement())
+  ip         String    @unique
+  ruleType   String    @default("BLOCK") // BLOCK | ALLOW
+  reason     String
+  offenses   Int       @default(1)
+  expiresAt  DateTime? // null = permanente
+  active     Boolean   @default(true)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+}
+
+model LoginAttempt {
+  id          Int       @id @default(autoincrement())
+  identifier  String    @unique // email ou ip
+  attempts    Int       @default(1)
+  lastFailed  DateTime  @default(now())
+  lockedUntil DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+
 
 
