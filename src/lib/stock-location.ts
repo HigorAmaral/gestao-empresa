@@ -300,6 +300,132 @@ export async function ensureStockLocationTables(): Promise<void> {
     await prisma.$executeRawUnsafe(`ALTER TABLE "ProductionOrder" ADD COLUMN IF NOT EXISTS "actualMinutes" INTEGER;`).catch(() => {});
     await prisma.$executeRawUnsafe(`ALTER TABLE "ProductionOrder" ADD COLUMN IF NOT EXISTS "scrapReason" TEXT;`).catch(() => {});
 
+    // 12. Expansão Completa do Módulo de RH & Departamento Pessoal (Employee, Relógio de Ponto REP, Folha, Férias e EPI/ASO)
+    await prisma.$executeRawUnsafe(`ALTER TABLE "Employee" ADD COLUMN IF NOT EXISTS "rg" VARCHAR(40);`).catch(() => {});
+    await prisma.$executeRawUnsafe(`ALTER TABLE "Employee" ADD COLUMN IF NOT EXISTS "pis" VARCHAR(40);`).catch(() => {});
+    await prisma.$executeRawUnsafe(`ALTER TABLE "Employee" ADD COLUMN IF NOT EXISTS "ctps" VARCHAR(60);`).catch(() => {});
+    await prisma.$executeRawUnsafe(`ALTER TABLE "Employee" ADD COLUMN IF NOT EXISTS "birthDate" TIMESTAMP(3);`).catch(() => {});
+    await prisma.$executeRawUnsafe(`ALTER TABLE "Employee" ADD COLUMN IF NOT EXISTS "emergencyContact" VARCHAR(200);`).catch(() => {});
+    await prisma.$executeRawUnsafe(`ALTER TABLE "Employee" ADD COLUMN IF NOT EXISTS "contractType" VARCHAR(30) NOT NULL DEFAULT 'CLT';`).catch(() => {});
+    await prisma.$executeRawUnsafe(`ALTER TABLE "Employee" ADD COLUMN IF NOT EXISTS "workHoursPerDay" DOUBLE PRECISION NOT NULL DEFAULT 8;`).catch(() => {});
+    await prisma.$executeRawUnsafe(`ALTER TABLE "Employee" ADD COLUMN IF NOT EXISTS "workSchedule" VARCHAR(150) DEFAULT '08:00 às 12:00 / 13:00 às 17:00';`).catch(() => {});
+    await prisma.$executeRawUnsafe(`ALTER TABLE "Employee" ADD COLUMN IF NOT EXISTS "dependentsCount" INTEGER NOT NULL DEFAULT 0;`).catch(() => {});
+    await prisma.$executeRawUnsafe(`ALTER TABLE "Employee" ADD COLUMN IF NOT EXISTS "vrAmount" DOUBLE PRECISION NOT NULL DEFAULT 0;`).catch(() => {});
+    await prisma.$executeRawUnsafe(`ALTER TABLE "Employee" ADD COLUMN IF NOT EXISTS "vtDaily" DOUBLE PRECISION NOT NULL DEFAULT 0;`).catch(() => {});
+    await prisma.$executeRawUnsafe(`ALTER TABLE "Employee" ADD COLUMN IF NOT EXISTS "vtOptIn" BOOLEAN NOT NULL DEFAULT false;`).catch(() => {});
+    await prisma.$executeRawUnsafe(`ALTER TABLE "Employee" ADD COLUMN IF NOT EXISTS "healthPlanDeduction" DOUBLE PRECISION NOT NULL DEFAULT 0;`).catch(() => {});
+    await prisma.$executeRawUnsafe(`ALTER TABLE "Employee" ADD COLUMN IF NOT EXISTS "hazardAdditionPct" DOUBLE PRECISION NOT NULL DEFAULT 0;`).catch(() => {});
+    await prisma.$executeRawUnsafe(`ALTER TABLE "Employee" ADD COLUMN IF NOT EXISTS "bankInfo" VARCHAR(200);`).catch(() => {});
+    await prisma.$executeRawUnsafe(`ALTER TABLE "Employee" ADD COLUMN IF NOT EXISTS "pixKey" VARCHAR(150);`).catch(() => {});
+
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "TimeClockMachine" (
+        "id" SERIAL PRIMARY KEY,
+        "name" VARCHAR(150) NOT NULL,
+        "brand" VARCHAR(80) NOT NULL DEFAULT 'CONTROL_ID',
+        "model" VARCHAR(120),
+        "serialNumber" VARCHAR(80),
+        "ipAddress" VARCHAR(80),
+        "port" INTEGER DEFAULT 443,
+        "apiToken" VARCHAR(150) NOT NULL,
+        "location" VARCHAR(150),
+        "status" VARCHAR(40) NOT NULL DEFAULT 'ONLINE',
+        "lastSyncAt" TIMESTAMP(3),
+        "totalSynced" INTEGER NOT NULL DEFAULT 0,
+        "active" BOOLEAN NOT NULL DEFAULT true,
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `).catch(() => {});
+
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "TimeClockLog" (
+        "id" SERIAL PRIMARY KEY,
+        "employeeId" INTEGER NOT NULL REFERENCES "Employee"("id") ON DELETE CASCADE,
+        "machineId" INTEGER REFERENCES "TimeClockMachine"("id") ON DELETE SET NULL,
+        "date" TIMESTAMP(3) NOT NULL,
+        "nsr" VARCHAR(50),
+        "checkIn1" VARCHAR(20),
+        "checkOut1" VARCHAR(20),
+        "checkIn2" VARCHAR(20),
+        "checkOut2" VARCHAR(20),
+        "workedMinutes" INTEGER NOT NULL DEFAULT 480,
+        "expectedMinutes" INTEGER NOT NULL DEFAULT 480,
+        "overtimeMinutes" INTEGER NOT NULL DEFAULT 0,
+        "lateMinutes" INTEGER NOT NULL DEFAULT 0,
+        "source" VARCHAR(50) NOT NULL DEFAULT 'REP_AFD',
+        "syncedToPayroll" BOOLEAN NOT NULL DEFAULT false,
+        "notes" TEXT,
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `).catch(() => {});
+
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "EmployeePayrollEvent" (
+        "id" SERIAL PRIMARY KEY,
+        "employeeId" INTEGER NOT NULL REFERENCES "Employee"("id") ON DELETE CASCADE,
+        "month" VARCHAR(20) NOT NULL,
+        "type" VARCHAR(30) NOT NULL,
+        "category" VARCHAR(60) NOT NULL,
+        "description" VARCHAR(255) NOT NULL,
+        "reference" VARCHAR(100),
+        "amount" DOUBLE PRECISION NOT NULL,
+        "financialId" INTEGER,
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `).catch(() => {});
+
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "EmployeeLeave" (
+        "id" SERIAL PRIMARY KEY,
+        "employeeId" INTEGER NOT NULL REFERENCES "Employee"("id") ON DELETE CASCADE,
+        "type" VARCHAR(50) NOT NULL,
+        "startDate" TIMESTAMP(3) NOT NULL,
+        "endDate" TIMESTAMP(3) NOT NULL,
+        "days" INTEGER NOT NULL DEFAULT 1,
+        "cid" VARCHAR(30),
+        "doctorName" VARCHAR(150),
+        "status" VARCHAR(40) NOT NULL DEFAULT 'APROVADO',
+        "vacationPay" DOUBLE PRECISION,
+        "notes" TEXT,
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `).catch(() => {});
+
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "EmployeeSafetyRecord" (
+        "id" SERIAL PRIMARY KEY,
+        "employeeId" INTEGER NOT NULL REFERENCES "Employee"("id") ON DELETE CASCADE,
+        "recordType" VARCHAR(30) NOT NULL,
+        "title" VARCHAR(200) NOT NULL,
+        "caNumber" VARCHAR(80),
+        "quantity" INTEGER NOT NULL DEFAULT 1,
+        "issuedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "expiresAt" TIMESTAMP(3),
+        "status" VARCHAR(40) NOT NULL DEFAULT 'VIGENTE',
+        "notes" TEXT,
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `).catch(() => {});
+
+    const repCount = await prisma.timeClockMachine.count().catch(() => 0);
+    if (repCount === 0) {
+      await prisma.timeClockMachine.createMany({
+        data: [
+          {
+            name: "Relógio Portaria Principal",
+            brand: "CONTROL_ID",
+            model: "Control iD iDClass Bio Facial (Portaria 671)",
+            serialNumber: "00014003750019283",
+            ipAddress: "192.168.1.201",
+            port: 443,
+            apiToken: "rep-sync-token-ifc-2026",
+            location: "Recepção / Entrada Operacional",
+            status: "ONLINE",
+          },
+        ],
+      }).catch(() => {});
+    }
+
     // Popula Contas Bancárias padrão caso vazio
     const bankCount = await prisma.bankAccount.count().catch(() => 0);
     if (bankCount === 0) {

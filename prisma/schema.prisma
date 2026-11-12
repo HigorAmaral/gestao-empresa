@@ -152,23 +152,131 @@ model Product {
 }
 
 model Employee {
-  id          Int      @id @default(autoincrement())
-  name        String
-  document    String?
-  email       String?
-  phone       String?
-  position    String
-  department  String?
-  salary      Float    @default(0)
-  hireDate    DateTime
-  active      Boolean  @default(true)
-  notes       String?
-  permissions String   @default("vendas,os,clientes,produtos,estoque,compras,fornecedores")
-  userId      Int?     @unique
-  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
-  createdAt   DateTime @default(now())
+  id                  Int       @id @default(autoincrement())
+  name                String
+  document            String?   // CPF
+  rg                  String?
+  pis                 String?   // PIS/PASEP/NIT (chave para sincronização com Relógio de Ponto REP/AFD)
+  ctps                String?   // Nº e Série da CTPS
+  birthDate           DateTime?
+  email               String?
+  phone               String?
+  emergencyContact    String?
+  position            String
+  department          String?
+  contractType        String    @default("CLT") // CLT | PJ | ESTAGIO | TEMPORARIO
+  salary              Float     @default(0)
+  workHoursPerDay     Float     @default(8)     // Jornada diária padrão (ex: 8h / 44h semanais)
+  workSchedule        String?   @default("08:00 às 12:00 / 13:00 às 17:00")
+  dependentsCount     Int       @default(0)     // Nº de dependentes para dedução de IRRF
+  vrAmount            Float     @default(0)     // Vale-Refeição / Alimentação mensal (R$)
+  vtDaily             Float     @default(0)     // Vale-Transporte diário (R$)
+  vtOptIn             Boolean   @default(false) // Optante por VT (desconto legal até 6%)
+  healthPlanDeduction Float     @default(0)     // Desconto mensal Plano de Saúde/Odonto (R$)
+  hazardAdditionPct   Float     @default(0)     // Adicional Insalubridade/Periculosidade (%)
+  bankInfo            String?                   // Banco / Agência / Conta
+  pixKey              String?                   // Chave PIX do colaborador
+  hireDate            DateTime
+  active              Boolean   @default(true)
+  notes               String?
+  permissions         String    @default("vendas,os,clientes,produtos,estoque,compras,fornecedores")
+  userId              Int?      @unique
+  user                User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt           DateTime  @default(now())
 
-  serviceOrders ServiceOrder[]
+  serviceOrders       ServiceOrder[]
+  timeClockLogs       TimeClockLog[]
+  payrollEvents       EmployeePayrollEvent[]
+  leaves              EmployeeLeave[]
+  safetyRecords       EmployeeSafetyRecord[]
+}
+
+// ---------- RH & Departamento Pessoal: Relógios de Ponto (REP), Folha, Férias e SST ----------
+
+model TimeClockMachine {
+  id            Int            @id @default(autoincrement())
+  name          String         // Ex: "Relógio Portaria Principal"
+  brand         String         @default("CONTROL_ID") // CONTROL_ID | HENRY | TOPDATA | DIMEP | INTELBRAS
+  model         String?        // Ex: "iDClass Bio", "Henry Prisma Super Fácil"
+  serialNumber  String?        // Nº de fabricação REP (17 dígitos)
+  ipAddress     String?        // Ex: "192.168.1.201"
+  port          Int?           @default(443)
+  apiToken      String         // Token de autenticação para Webhook / Push Sync
+  location      String?        // Ex: "Entrada Fábrica / Recepção"
+  status        String         @default("ONLINE") // ONLINE | OFFLINE | MANUTENCAO
+  lastSyncAt    DateTime?
+  totalSynced   Int            @default(0)
+  active        Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+
+  logs          TimeClockLog[]
+}
+
+model TimeClockLog {
+  id              Int               @id @default(autoincrement())
+  employeeId      Int
+  employee        Employee          @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  machineId       Int?
+  machine         TimeClockMachine? @relation(fields: [machineId], references: [id], onDelete: SetNull)
+  date            DateTime          // Data da batida (UTC midnight)
+  nsr             String?           // Número Sequencial de Registro (AFD Portaria 671/1510)
+  checkIn1        String?           // Ex: "08:00"
+  checkOut1       String?           // Ex: "12:00"
+  checkIn2        String?           // Ex: "13:00"
+  checkOut2       String?           // Ex: "17:45"
+  workedMinutes   Int               @default(480) // Total trabalhado em minutos
+  expectedMinutes Int               @default(480) // Jornada esperada em minutos
+  overtimeMinutes Int               @default(0)   // Horas extras apuradas no dia (min)
+  lateMinutes     Int               @default(0)   // Atrasos / faltas no dia (min)
+  source          String            @default("REP_AFD") // REP_AFD | WEBHOOK_API | AJUSTE_RH
+  syncedToPayroll Boolean           @default(false)
+  notes           String?
+  createdAt       DateTime          @default(now())
+}
+
+model EmployeePayrollEvent {
+  id          Int      @id @default(autoincrement())
+  employeeId  Int
+  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  month       String   // YYYY-MM (ex: "2026-11")
+  type        String   // PROVENTO | DESCONTO
+  category    String   // HORA_EXTRA | BONUS | COMISSAO | ADIANTAMENTO_VALE | FALTA_ATRASO | OUTROS
+  description String
+  reference   String?  // Ex: "12h 50%", "Vale 20/11", "2 dias"
+  amount      Float
+  financialId Int?     // Se gerou título no financeiro (ex: Vale Quinzenal)
+  createdAt   DateTime @default(now())
+}
+
+model EmployeeLeave {
+  id          Int       @id @default(autoincrement())
+  employeeId  Int
+  employee    Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  type        String    // FERIAS | ATESTADO_MEDICO | LICENCA | FALTA_INJUSTIFICADA
+  startDate   DateTime
+  endDate     DateTime
+  days        Int       @default(1)
+  cid         String?   // Código CID (para atestados)
+  doctorName  String?   // Médico / CRM
+  status      String    @default("APROVADO") // PROGRAMADA | EM_GOZO | CONCLUIDA | APROVADO
+  vacationPay Float?    // Valor de férias + 1/3 (se tipo == FERIAS)
+  notes       String?
+  createdAt   DateTime  @default(now())
+}
+
+model EmployeeSafetyRecord {
+  id          Int       @id @default(autoincrement())
+  employeeId  Int
+  employee    Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  recordType  String    // EPI | ASO
+  title       String    // Nome do EPI (ex: "Bota de Segurança") ou Tipo de Exame (ex: "ASO Periódico")
+  caNumber    String?   // Certificado de Aprovação (para EPI) ou Resultado ("APTO")
+  quantity    Int       @default(1)
+  issuedAt    DateTime  @default(now())
+  expiresAt   DateTime? // Data de validade do EPI ou vencimento do ASO
+  status      String    @default("VIGENTE") // VIGENTE | VENCIDO | DEVOLVIDO
+  notes       String?
+  createdAt   DateTime  @default(now())
 }
 
 // ---------- Movimentações ----------

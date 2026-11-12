@@ -5,6 +5,7 @@ import { SESSION_COOKIE, verifyToken } from "@/lib/token";
 const PUBLIC_PATHS = [
   "/login",
   "/p",
+  "/api/rep/sync",
   "/manifest.webmanifest",
   "/sw.js",
   "/api/pwa-icon",
