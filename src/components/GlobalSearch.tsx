@@ -18,6 +18,10 @@ const QUICK_ACTIONS: SearchResult[] = [
   { type: "Atalho", title: "Novo Cliente", subtitle: "Cadastrar cliente na carteira", href: "/clientes/novo" },
   { type: "Atalho", title: "Novo Produto", subtitle: "Adicionar item ao catálogo", href: "/produtos/novo" },
   { type: "Atalho", title: "Consultar Estoque", subtitle: "Saldos e movimentações", href: "/estoque" },
+  { type: "RH & DP", title: "Colaboradores & Folha de Pagamento", subtitle: "Holerites CLT/PJ, Vale Quinzenal e INSS/FGTS", href: "/funcionarios" },
+  { type: "RH & DP", title: "Relógio de Ponto (REP) & Espelho", subtitle: "Sincronizar máquinas de ponto físicas e horas extras", href: "/funcionarios/ponto" },
+  { type: "RH & DP", title: "Férias, Atestados & Licenças", subtitle: "Controle aquisitivo/concessivo e atestados com CID", href: "/funcionarios/ferias" },
+  { type: "RH & DP", title: "EPIs & Exames Ocupacionais (SST)", subtitle: "Fichas de EPI com CA e controle de exames ASO", href: "/funcionarios/sst" },
 ];
 
 export function GlobalSearch() {

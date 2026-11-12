@@ -265,14 +265,16 @@ export async function createTimeClockMachineAction(fd: FormData) {
 
   await logAudit(session, "RH", "CRIAR", `Cadastrou Relógio de Ponto Físico "${name}" (${brand})`, created.id);
   revalidatePath("/funcionarios");
-  redirect("/funcionarios?tab=ponto&ok=" + encodeURIComponent(`Relógio de Ponto "${name}" configurado com sucesso!`));
+  revalidatePath("/funcionarios/ponto");
+  redirect("/funcionarios/ponto?ok=" + encodeURIComponent(`Relógio de Ponto "${name}" configurado com sucesso!`));
 }
 
 export async function deleteTimeClockMachineAction(id: number) {
   await requireAdmin("funcionarios");
   await prisma.timeClockMachine.delete({ where: { id } });
   revalidatePath("/funcionarios");
-  redirect("/funcionarios?tab=ponto&ok=" + encodeURIComponent("Relógio de ponto removido."));
+  revalidatePath("/funcionarios/ponto");
+  redirect("/funcionarios/ponto?ok=" + encodeURIComponent("Relógio de ponto removido."));
 }
 
 /**
@@ -289,12 +291,12 @@ export async function syncRepMachineNowAction(fd: FormData) {
     : await prisma.timeClockMachine.findFirst({ where: { active: true } });
 
   if (!machine) {
-    redirect("/funcionarios?tab=ponto&erro=" + encodeURIComponent("Cadastre ao menos uma máquina de Relógio de Ponto antes de sincronizar."));
+    redirect("/funcionarios/ponto?erro=" + encodeURIComponent("Cadastre ao menos uma máquina de Relógio de Ponto antes de sincronizar."));
   }
 
   const employees = await prisma.employee.findMany({ where: { active: true } });
   if (employees.length === 0) {
-    redirect("/funcionarios?tab=ponto&erro=" + encodeURIComponent("Nenhum colaborador ativo para sincronizar."));
+    redirect("/funcionarios/ponto?erro=" + encodeURIComponent("Nenhum colaborador ativo para sincronizar."));
   }
 
   const [y, m] = month.split("-").map(Number);
@@ -380,8 +382,9 @@ export async function syncRepMachineNowAction(fd: FormData) {
 
   await logAudit(session, "RH", "SYNC_REP", `Sincronizou ${syncedRecords} registros de ponto da máquina "${machine.name}"`, machine.id);
   revalidatePath("/funcionarios");
+  revalidatePath("/funcionarios/ponto");
   redirect(
-    `/funcionarios?tab=ponto&month=${month}&ok=` +
+    `/funcionarios/ponto?month=${month}&ok=` +
       encodeURIComponent(
         syncedRecords > 0
           ? `Sincronização concluída com "${machine.name}": ${syncedRecords} registro(s) de batida recebidos da máquina!`
@@ -400,13 +403,13 @@ export async function importAfdFileAction(fd: FormData) {
   const rawContent = str(fd, "afdContent") || "";
 
   if (!rawContent.trim()) {
-    redirect(`/funcionarios?tab=ponto&month=${month}&erro=` + encodeURIComponent("Cole ou carregue o conteúdo do arquivo AFD/CSV da máquina de ponto."));
+    redirect(`/funcionarios/ponto?month=${month}&erro=` + encodeURIComponent("Cole ou carregue o conteúdo do arquivo AFD/CSV da máquina de ponto."));
   }
 
   const parsed = parseAfdContent(rawContent);
   if (parsed.length === 0) {
     redirect(
-      `/funcionarios?tab=ponto&month=${month}&erro=` +
+      `/funcionarios/ponto?month=${month}&erro=` +
         encodeURIComponent("Nenhuma marcação de ponto válida (Tipo 3 Portaria 1510/671 ou CSV PIS;DATA;HORA) encontrada no arquivo.")
     );
   }
@@ -486,7 +489,8 @@ export async function importAfdFileAction(fd: FormData) {
 
   await logAudit(session, "RH", "IMPORTAR_AFD", `Importou ${count} dia(s) de batidas via arquivo AFD`, machineId);
   revalidatePath("/funcionarios");
-  redirect(`/funcionarios?tab=ponto&month=${month}&ok=` + encodeURIComponent(`${count} registro(s) de ponto importados do arquivo AFD com sucesso!`));
+  revalidatePath("/funcionarios/ponto");
+  redirect(`/funcionarios/ponto?month=${month}&ok=` + encodeURIComponent(`${count} registro(s) de ponto importados do arquivo AFD com sucesso!`));
 }
 
 /**
@@ -506,7 +510,7 @@ export async function transferRepToPayrollAction(fd: FormData) {
   });
 
   if (logs.length === 0) {
-    redirect(`/funcionarios?tab=ponto&month=${month}&erro=` + encodeURIComponent(`Nenhuma batida sincronizada em ${month} para enviar à folha.`));
+    redirect(`/funcionarios/ponto?month=${month}&erro=` + encodeURIComponent(`Nenhuma batida sincronizada em ${month} para enviar à folha.`));
   }
 
   let createdEvents = 0;
@@ -685,7 +689,7 @@ export async function createEmployeeLeaveAction(fd: FormData) {
   const notes = str(fd, "notes") || null;
 
   if (!employeeId || !startDate || !endDate) {
-    redirect("/funcionarios?tab=ferias&erro=" + encodeURIComponent("Selecione o colaborador e informe a data inicial e final."));
+    redirect("/funcionarios/ferias?erro=" + encodeURIComponent("Selecione o colaborador e informe a data inicial e final."));
   }
 
   const diffDays = Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1);
@@ -707,14 +711,16 @@ export async function createEmployeeLeaveAction(fd: FormData) {
 
   await logAudit(session, "RH", "CRIAR_AFASTAMENTO", `Registrou ${type} (${diffDays} dias) para colaborador #${employeeId}`, employeeId);
   revalidatePath("/funcionarios");
-  redirect("/funcionarios?tab=ferias&ok=" + encodeURIComponent(`Registro de ${type} (${diffDays} dias) salvo com sucesso!`));
+  revalidatePath("/funcionarios/ferias");
+  redirect("/funcionarios/ferias?ok=" + encodeURIComponent(`Registro de ${type} (${diffDays} dias) salvo com sucesso!`));
 }
 
 export async function deleteEmployeeLeaveAction(id: number) {
   await requireAdmin("funcionarios");
   await prisma.employeeLeave.delete({ where: { id } });
   revalidatePath("/funcionarios");
-  redirect("/funcionarios?tab=ferias&ok=" + encodeURIComponent("Registro de férias/afastamento excluído."));
+  revalidatePath("/funcionarios/ferias");
+  redirect("/funcionarios/ferias?ok=" + encodeURIComponent("Registro de férias/afastamento excluído."));
 }
 
 // ============================================================================
@@ -736,7 +742,7 @@ export async function createSafetyRecordAction(fd: FormData) {
   const notes = [doctorOrClinic ? `Clínica/Médico: ${doctorOrClinic}` : "", notesInput].filter(Boolean).join(" · ") || null;
 
   if (!employeeId) {
-    redirect("/funcionarios?tab=sst&erro=" + encodeURIComponent("Selecione o colaborador."));
+    redirect("/funcionarios/sst?erro=" + encodeURIComponent("Selecione o colaborador."));
   }
 
   await prisma.employeeSafetyRecord.create({
@@ -755,12 +761,14 @@ export async function createSafetyRecordAction(fd: FormData) {
 
   await logAudit(session, "RH", "CRIAR_SST", `Registrou ${recordType}: "${title}" para colaborador #${employeeId}`, employeeId);
   revalidatePath("/funcionarios");
-  redirect("/funcionarios?tab=sst&ok=" + encodeURIComponent(`${recordType === "EPI" ? "Entrega de EPI" : "Exame Ocupacional (ASO)"} registrado com sucesso!`));
+  revalidatePath("/funcionarios/sst");
+  redirect("/funcionarios/sst?ok=" + encodeURIComponent(`${recordType === "EPI" ? "Entrega de EPI" : "Exame Ocupacional (ASO)"} registrado com sucesso!`));
 }
 
 export async function deleteSafetyRecordAction(id: number) {
   await requireAdmin("funcionarios");
   await prisma.employeeSafetyRecord.delete({ where: { id } });
   revalidatePath("/funcionarios");
-  redirect("/funcionarios?tab=sst&ok=" + encodeURIComponent("Registro de SST removido."));
+  revalidatePath("/funcionarios/sst");
+  redirect("/funcionarios/sst?ok=" + encodeURIComponent("Registro de SST removido."));
 }

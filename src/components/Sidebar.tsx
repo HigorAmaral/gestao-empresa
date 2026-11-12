@@ -6,10 +6,13 @@ import { useEffect, useState } from "react";
 import {
   BarChart3,
   Building2,
+  Calendar,
   ChevronRight,
   ClipboardCheck,
+  Cpu,
   Factory,
   FileText,
+  HeartPulse,
   History,
   LayoutDashboard,
   LogOut,
@@ -77,6 +80,15 @@ const SECTIONS: { title: string; items: Item[] }[] = [
     ],
   },
   {
+    title: "RH & Depto. Pessoal",
+    items: [
+      { href: "/funcionarios", label: "Colaboradores & Folha", Icon: UserCheck, moduleKey: "funcionarios" },
+      { href: "/funcionarios/ponto", label: "Relógio de Ponto (REP)", Icon: Cpu, moduleKey: "funcionarios" },
+      { href: "/funcionarios/ferias", label: "Férias & Atestados", Icon: Calendar, moduleKey: "funcionarios" },
+      { href: "/funcionarios/sst", label: "EPIs & Exames (SST)", Icon: HeartPulse, moduleKey: "funcionarios" },
+    ],
+  },
+  {
     title: "Gestão & Sistema",
     items: [
       {
@@ -86,7 +98,6 @@ const SECTIONS: { title: string; items: Item[] }[] = [
         moduleKey: "financeiro",
         alertKey: "financeiro",
       },
-      { href: "/funcionarios", label: "Funcionários", Icon: UserCheck, moduleKey: "funcionarios" },
       { href: "/relatorios", label: "Relatórios", Icon: BarChart3, moduleKey: "relatorios" },
       { href: "/usuarios", label: "Usuários", Icon: ShieldCheck, moduleKey: "usuarios" },
       { href: "/auditoria", label: "Auditoria", Icon: History, moduleKey: "auditoria" },

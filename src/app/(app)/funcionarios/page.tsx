@@ -152,11 +152,38 @@ export default async function FuncionariosPage({ searchParams }: { searchParams:
   const totalOvertimeMinMonth = clockLogs.reduce((s, l) => s + (l.overtimeMinutes || 0), 0);
   const totalLateMinMonth = clockLogs.reduce((s, l) => s + (l.lateMinutes || 0), 0);
 
+  const headerTitle =
+    tab === "ponto"
+      ? "Relógio de Ponto Eletrônico (REP) & Espelho"
+      : tab === "ferias"
+        ? "Férias, Atestados Médicos & Licenças"
+        : tab === "sst"
+          ? "Segurança do Trabalho (EPIs & Exames ASO)"
+          : "Colaboradores & Folha de Pagamento";
+
+  const headerSubtitle =
+    tab === "ponto"
+      ? "Configuração e sincronização com máquinas físicas de bater ponto (Portaria 671 & 1510 MTE) e integração com a folha"
+      : tab === "ferias"
+        ? "Controle automático de período aquisitivo/concessivo CLT, atestados médicos com CID e licenças"
+        : tab === "sst"
+          ? "Controle de entrega de EPIs com Certificado de Aprovação (CA) e Exames Ocupacionais ASO (NR-06 / NR-07)"
+          : "Prontuário trabalhista CLT/PJ/Estágio, cálculo de INSS/IRRF/FGTS, Vale Quinzenal e emissão de Holerite Oficial";
+
+  const currentBasePath =
+    tab === "ponto"
+      ? "/funcionarios/ponto"
+      : tab === "ferias"
+        ? "/funcionarios/ferias"
+        : tab === "sst"
+          ? "/funcionarios/sst"
+          : "/funcionarios";
+
   return (
     <>
       <PageHeader
-        title="RH & Departamento Pessoal"
-        subtitle="Folha de pagamento CLT/PJ, sincronização com Relógio de Ponto Físico (REP), Férias e Segurança do Trabalho (SST)"
+        title={headerTitle}
+        subtitle={headerSubtitle}
         actions={
           <>
             <ExportCsvButton entity="funcionarios" />
@@ -168,7 +195,7 @@ export default async function FuncionariosPage({ searchParams }: { searchParams:
       />
       <FlashMessages sp={sp} />
 
-      {/* Navegação por Abas do Módulo de RH & DP */}
+      {/* Navegação por Áreas do Módulo de RH & DP */}
       <div
         className="card mb"
         style={{
@@ -182,33 +209,32 @@ export default async function FuncionariosPage({ searchParams }: { searchParams:
       >
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
           <Link
-            href={`/funcionarios?tab=folha&month=${refMonth}`}
+            href={`/funcionarios?month=${refMonth}`}
             className={`btn ${tab === "folha" ? "" : "secondary"}`}
           >
             <Users size={15} /> Colaboradores & Folha ({allActiveEmployees.length})
           </Link>
           <Link
-            href={`/funcionarios?tab=ponto&month=${refMonth}`}
+            href={`/funcionarios/ponto?month=${refMonth}`}
             className={`btn ${tab === "ponto" ? "" : "secondary"}`}
           >
             <Cpu size={15} /> Relógio de Ponto (REP) & Espelho ({clockLogs.length})
           </Link>
           <Link
-            href={`/funcionarios?tab=ferias&month=${refMonth}`}
+            href={`/funcionarios/ferias?month=${refMonth}`}
             className={`btn ${tab === "ferias" ? "" : "secondary"}`}
           >
             <Calendar size={15} /> Férias, Atestados & Licenças ({leaves.length})
           </Link>
           <Link
-            href={`/funcionarios?tab=sst&month=${refMonth}`}
+            href={`/funcionarios/sst?month=${refMonth}`}
             className={`btn ${tab === "sst" ? "" : "secondary"}`}
           >
             <ShieldCheck size={15} /> EPIs & Exames ASO ({safetyRecords.length})
           </Link>
         </div>
 
-        <form method="GET" action="/funcionarios" style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <input type="hidden" name="tab" value={tab} />
+        <form method="GET" action={currentBasePath} style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <span className="small muted bold">Competência:</span>
           <input
             type="month"
