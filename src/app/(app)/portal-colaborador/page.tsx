@@ -15,11 +15,9 @@ import {
 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
-import { spStr } from "@/lib/form";
 import { brl, fmtDate, todayInput } from "@/lib/format";
 import { ensureStockLocationTables } from "@/lib/stock-location";
 import { FlashMessages, PageHeader } from "@/components/ui";
-import { EmployeeSimulatorSelect } from "./EmployeeSimulatorSelect";
 import { requestVacationAction } from "./actions";
 
 type SP = Promise<Record<string, string | string[] | undefined>>;
@@ -29,57 +27,23 @@ export default async function PortalColaboradorPage({ searchParams }: { searchPa
   const session = await requireUser();
   const sp = await searchParams;
 
-  // Busca colaborador vinculado ao usuário logado (por userId, email ou id do searchParams se admin)
-  const empIdStr = spStr(sp, "empId");
-  const empIdParam = empIdStr ? Number(empIdStr) : undefined;
-
-  let employee = null;
-  if (empIdParam && session.role === "ADMIN") {
-    employee = await prisma.employee.findUnique({
-      where: { id: empIdParam },
-      include: {
-        leaves: { orderBy: { startDate: "desc" }, take: 10 },
-        safetyRecords: { orderBy: { issuedAt: "desc" }, take: 10 },
-        timeClockLogs: { orderBy: { date: "desc" }, take: 20 },
-      },
-    });
-  }
-
-  if (!employee) {
-    employee = await prisma.employee.findFirst({
-      where: {
-        OR: [
-          { userId: session.userId },
-          { email: session.email },
-        ],
-      },
-      include: {
-        leaves: { orderBy: { startDate: "desc" }, take: 10 },
-        safetyRecords: { orderBy: { issuedAt: "desc" }, take: 10 },
-        timeClockLogs: { orderBy: { date: "desc" }, take: 20 },
-      },
-    });
-  }
-
-  // Se for admin e não tiver colaborador direto vinculado, pega o primeiro ativo para exibição
-  if (!employee && session.role === "ADMIN") {
-    employee = await prisma.employee.findFirst({
-      where: { active: true },
-      include: {
-        leaves: { orderBy: { startDate: "desc" }, take: 10 },
-        safetyRecords: { orderBy: { issuedAt: "desc" }, take: 10 },
-        timeClockLogs: { orderBy: { date: "desc" }, take: 20 },
-      },
-    });
-  }
-
-  const allActiveEmployees =
-    session.role === "ADMIN"
-      ? await prisma.employee.findMany({ where: { active: true }, select: { id: true, name: true } })
-      : [];
+  // Busca ESTRITAMENTE o colaborador vinculado ao usuário logado (privacidade e proteção LGPD)
+  const employee = await prisma.employee.findFirst({
+    where: {
+      active: true,
+      OR: [
+        { userId: session.userId },
+        { email: session.email },
+      ],
+    },
+    include: {
+      leaves: { orderBy: { startDate: "desc" }, take: 15 },
+      safetyRecords: { orderBy: { issuedAt: "desc" }, take: 15 },
+      timeClockLogs: { orderBy: { date: "desc" }, take: 20 },
+    },
+  });
 
   const now = new Date();
-  const curMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 
   // Gera lista dos últimos 6 meses para download de holerite
   const recentMonths: { key: string; label: string }[] = [];
@@ -90,25 +54,51 @@ export default async function PortalColaboradorPage({ searchParams }: { searchPa
     recentMonths.push({ key, label: label.charAt(0).toUpperCase() + label.slice(1) });
   }
 
+  // Se o usuário logado não possui ficha de funcionário vinculada
   if (!employee) {
     return (
       <>
         <PageHeader
           title="Portal do Colaborador"
-          subtitle="Área de autoatendimento e consulta de holerites para a equipe"
+          subtitle="Área individual de autoatendimento e consulta de holerites para a equipe"
         />
-        <div className="card text-center" style={{ padding: 40 }}>
-          <UserCheck size={36} style={{ margin: "0 auto 12px", opacity: 0.5 }} />
-          <h3>Nenhum registro de colaborador vinculado</h3>
-          <p className="muted">
-            Seu usuário de acesso ({session.email}) ainda não está vinculado a uma ficha de funcionário no RH. Solicite ao administrador do sistema para vincular seu usuário no menu <strong>RH & Depto. Pessoal ➔ Equipe</strong>.
+        <FlashMessages sp={sp} />
+
+        <div className="card text-center" style={{ padding: 48, maxWidth: 640, margin: "20px auto" }}>
+          <UserCheck size={44} style={{ margin: "0 auto 14px", opacity: 0.4 }} />
+          <h3 style={{ marginBottom: 8, fontSize: 18 }}>Nenhuma ficha de colaborador vinculada ao seu usuário</h3>
+          <p className="muted" style={{ lineHeight: 1.6, fontSize: 13.5 }}>
+            Você está conectado como <strong>{session.name}</strong> ({session.email}).<br />
+            Por segurança e sigilo de dados da equipe (LGPD), cada colaborador só pode visualizar exclusivamente as suas próprias informações salariais, recibos e ponto.
           </p>
+
+          {session.role === "ADMIN" && (
+            <div
+              style={{
+                marginTop: 24,
+                padding: 16,
+                background: "var(--surface-subtle)",
+                borderRadius: 8,
+                border: "1px solid var(--border)",
+                textAlign: "left",
+                fontSize: 13,
+              }}
+            >
+              <strong style={{ display: "block", marginBottom: 6 }}>Instrução para o Administrador:</strong>
+              <p className="muted" style={{ margin: "0 0 12px 0", lineHeight: 1.5 }}>
+                Para visualizar seus próprios holerites aqui no portal, vincule seu usuário de login à sua ficha de colaborador no RH.
+              </p>
+              <Link href="/funcionarios" className="btn sm">
+                Ir para Cadastro de Equipe & Prontuários
+              </Link>
+            </div>
+          )}
         </div>
       </>
     );
   }
 
-  // Cálculo de período de férias
+  // Cálculo de período de férias estritamente deste colaborador
   const hire = employee.hireDate ? new Date(employee.hireDate) : new Date();
   const monthsWorked = Math.max(
     0,
@@ -121,16 +111,11 @@ export default async function PortalColaboradorPage({ searchParams }: { searchPa
     <>
       <PageHeader
         title={`Portal do Colaborador — ${employee.name}`}
-        subtitle={`Autoatendimento RH: consulte seus holerites oficiais, espelho de ponto, férias e segurança do trabalho.`}
-        actions={
-          session.role === "ADMIN" && allActiveEmployees.length > 1 ? (
-            <EmployeeSimulatorSelect employees={allActiveEmployees} currentId={employee.id} />
-          ) : undefined
-        }
+        subtitle="Área individual de autoatendimento: consulte seus holerites, espelho de ponto, férias e segurança do trabalho."
       />
       <FlashMessages sp={sp} />
 
-      {/* Cartão de Identificação do Colaborador */}
+      {/* Cartão de Identificação do Próprio Colaborador */}
       <div className="card mb">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 16 }}>
           <div>
@@ -216,7 +201,6 @@ export default async function PortalColaboradorPage({ searchParams }: { searchPa
           <div style={{ padding: 16 }}>
             <h4 style={{ margin: "0 0 10px 0", fontSize: 13 }}>Solicitar Férias com Antecedência</h4>
             <form action={requestVacationAction}>
-              <input type="hidden" name="employeeId" value={employee.id} />
               <div className="form-grid mb">
                 <div className="field s6">
                   <label>Data Pretendida de Início *</label>
@@ -243,7 +227,7 @@ export default async function PortalColaboradorPage({ searchParams }: { searchPa
 
             {/* Histórico recente */}
             <div style={{ marginTop: 16 }}>
-              <strong style={{ fontSize: 12, display: "block", marginBottom: 6 }}>Histórico Recente de Afastamentos / Férias:</strong>
+              <strong style={{ fontSize: 12, display: "block", marginBottom: 6 }}>Histórico dos Meus Afastamentos / Férias:</strong>
               {employee.leaves.map((l) => (
                 <div
                   key={l.id}

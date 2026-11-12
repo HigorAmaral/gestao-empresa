@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import { requireAdmin } from "@/lib/auth";
+import { requireUser } from "@/lib/auth";
 import { getCompanySettings } from "@/lib/audit";
 import { brl, fmtDate, todayInput } from "@/lib/format";
 import { ensureStockLocationTables } from "@/lib/stock-location";
@@ -17,10 +17,28 @@ export default async function EmployeePayslipPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  await requireAdmin("funcionarios");
+  const session = await requireUser();
   await ensureStockLocationTables();
 
   const { id } = await params;
+  const empId = Number(id);
+
+  // Se não for admin, garante privacidade: o colaborador só pode visualizar o seu próprio holerite
+  if (session.role !== "ADMIN") {
+    const isSelf = await prisma.employee.findFirst({
+      where: {
+        id: empId,
+        OR: [
+          { userId: session.userId },
+          { email: session.email },
+        ],
+      },
+    });
+    if (!isSelf) {
+      redirect("/portal-colaborador?erro=" + encodeURIComponent("Acesso negado: você só pode visualizar o seu próprio holerite."));
+    }
+  }
+
   const sp = await searchParams;
   const refMonth = typeof sp.mes === "string" && /^\d{4}-\d{2}$/.test(sp.mes) ? sp.mes : todayInput().slice(0, 7);
   const [y, m] = refMonth.split("-");
