@@ -9,20 +9,17 @@ import {
   EyeOff,
   HelpCircle,
   KeyRound,
-  Layers,
   Loader2,
   Lock,
   Mail,
   Phone,
-  Server,
-  Shield,
   ShieldCheck,
   Sparkles,
-  TrendingUp,
   UserCheck,
   X,
 } from "lucide-react";
 import { login } from "./actions";
+import { MascotWall, type MascotState } from "./MascotWall";
 
 export interface LoginFormProps {
   brandName: string;
@@ -48,6 +45,8 @@ export function LoginForm({
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [showHelpModal, setShowHelpModal] = useState(false);
+  const [focusField, setFocusField] = useState<"email" | "password" | null>(null);
+  const [clearedError, setClearedError] = useState(false);
 
   // Recupera e-mail salvo se habilitado
   useEffect(() => {
@@ -59,13 +58,26 @@ export function LoginForm({
     } catch {}
   }, []);
 
+  // Quando o state.error muda (novo erro do servidor), reativa a reação de susto da mascote
+  useEffect(() => {
+    if (state?.error) {
+      setClearedError(false);
+    }
+  }, [state?.error]);
+
   const handleEmailChange = (val: string) => {
     setEmail(val);
+    setClearedError(true);
     if (rememberMe) {
       try {
         localStorage.setItem("gestaopro_saved_email", val);
       } catch {}
     }
+  };
+
+  const handlePasswordChange = (val: string) => {
+    setPassword(val);
+    setClearedError(true);
   };
 
   const handleRememberToggle = (checked: boolean) => {
@@ -84,6 +96,8 @@ export function LoginForm({
   const fillDemo = (demoEmail: string, demoPass: string) => {
     setEmail(demoEmail);
     setPassword(demoPass);
+    setClearedError(true);
+    setFocusField("password");
     if (rememberMe) {
       try {
         localStorage.setItem("gestaopro_saved_email", demoEmail);
@@ -91,128 +105,98 @@ export function LoginForm({
     }
   };
 
+  // Determina o estado de humor e reação física da mascote na parede
+  let mascotState: MascotState = "idle";
+  if (pending) {
+    mascotState = "pending";
+  } else if (state?.error && !clearedError) {
+    mascotState = "error";
+  } else if (focusField === "password") {
+    mascotState = showPassword ? "password_visible" : "password_hidden";
+  } else if (focusField === "email") {
+    mascotState = "email";
+  }
+
   return (
-    <div className="corp-login-wrapper">
-      {/* Barra sutil de status corporativo no topo */}
-      <header className="corp-login-topbar">
-        <div className="corp-login-topbar-inner">
-          <div className="corp-status-indicator">
-            <span className="corp-status-dot" />
-            <span>Ambiente Corporativo Conectado</span>
-            <span className="corp-status-badge">SSL 256-bit</span>
+    <div className="bw-login-wrapper">
+      {/* Topbar Monocromática com Status */}
+      <header className="bw-login-topbar">
+        <div className="bw-login-topbar-inner">
+          <div className="bw-status-indicator">
+            <span className="bw-status-dot" />
+            <span>Sistema Operacional Corporativo</span>
+            <span className="bw-status-badge">Preto & Branco • Enterprise</span>
           </div>
-          <div className="corp-topbar-info">
+          <div className="bw-topbar-info">
             {companyDocument && <span>CNPJ: {companyDocument}</span>}
             <button
               type="button"
-              className="corp-help-trigger"
+              className="bw-help-trigger"
               onClick={() => setShowHelpModal(true)}
             >
-              <HelpCircle size={14} /> Suporte de TI
+              <HelpCircle size={14} /> Suporte TI
             </button>
           </div>
         </div>
       </header>
 
-      {/* Conteúdo Central: Card Dividido Enterprise */}
-      <main className="corp-login-main">
-        <div className="corp-login-card">
-          {/* Coluna Esquerda: Apresentação Institucional e Governança */}
-          <aside className="corp-login-hero">
-            <div className="corp-hero-content">
-              {/* Logo e Nome da Empresa */}
-              <div className="corp-hero-brand">
+      {/* Conteúdo Principal Dividido */}
+      <main className="bw-login-main">
+        <div className="bw-login-card">
+          {/* ====================================================
+              COLUNA ESQUERDA: MASCOTE ANIMADA EM CIMA DA PAREDE
+              ==================================================== */}
+          <aside className="bw-login-hero">
+            <div className="bw-hero-top">
+              <div className="bw-hero-brand">
                 {logoUrl ? (
                   <img
                     src={logoUrl}
                     alt={brandName}
-                    className="corp-hero-logo"
+                    className="bw-hero-logo"
                   />
                 ) : (
-                  <div className="corp-hero-logo-placeholder">
-                    <Building2 size={28} />
+                  <div className="bw-hero-logo-placeholder">
+                    <Building2 size={24} />
                   </div>
                 )}
                 <div>
-                  <h2 className="corp-hero-title">{brandName}</h2>
-                  <p className="corp-hero-subtitle">{companyName}</p>
+                  <h2 className="bw-hero-title">{brandName}</h2>
+                  <p className="bw-hero-subtitle">{companyName}</p>
                 </div>
               </div>
 
-              {/* Título de Boas-Vindas */}
-              <div className="corp-hero-statement">
-                <h1>Sistema Integrado de Gestão Empresarial</h1>
-                <p>
-                  Plataforma unificada para controladoria financeira, inteligência comercial,
-                  emissão de NF-e, logística de estoque, ordens de serviço e gestão de pessoas.
-                </p>
-              </div>
-
-              {/* Pilares Estratégicos Corporativos */}
-              <div className="corp-hero-features">
-                <div className="corp-feature-box">
-                  <div className="corp-feature-icon">
-                    <ShieldCheck size={18} />
-                  </div>
-                  <div>
-                    <strong>Governança & Rastreabilidade</strong>
-                    <span>Auditoria completa com isolamento de dados LGPD.</span>
-                  </div>
-                </div>
-
-                <div className="corp-feature-box">
-                  <div className="corp-feature-icon">
-                    <TrendingUp size={18} />
-                  </div>
-                  <div>
-                    <strong>Controladoria em Tempo Real</strong>
-                    <span>DRE gerencial, conciliação OFX e faturamento Pix.</span>
-                  </div>
-                </div>
-
-                <div className="corp-feature-box">
-                  <div className="corp-feature-icon">
-                    <Layers size={18} />
-                  </div>
-                  <div>
-                    <strong>Operações & WMS de Estoque</strong>
-                    <span>Chão de fábrica, rastreio por lote e ordens técnicas.</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Selos de Certificação & Segurança */}
-              <div className="corp-hero-trust">
-                <div className="corp-trust-item">
-                  <Shield size={14} /> Criptografia Ponta a Ponta
-                </div>
-                <div className="corp-trust-item">
-                  <Server size={14} /> Alta Disponibilidade 99.9%
-                </div>
-                <div className="corp-trust-item">
-                  <CheckCircle2 size={14} /> Conforme LGPD
-                </div>
+              <div className="bw-hero-tag">
+                <ShieldCheck size={13} /> Muralha de Segurança & Auditoria
               </div>
             </div>
 
-            <footer className="corp-hero-footer">
-              © {new Date().getFullYear()} {companyName}. Uso restrito e confidencial.
+            {/* A Mascote Interativa sobre o Muro */}
+            <div className="bw-hero-mascot-slot">
+              <MascotWall state={mascotState} brandName={brandName} />
+            </div>
+
+            <footer className="bw-hero-footer">
+              <span>© {new Date().getFullYear()} {companyName}</span>
+              <span>Acesso restrito e criptografado</span>
             </footer>
           </aside>
 
-          {/* Coluna Direita: Formulário de Autenticação */}
-          <section className="corp-login-form-area">
-            <div className="corp-form-header">
-              <div className="corp-form-kicker">
-                <UserCheck size={14} /> Portal do Colaborador & Gestão
+          {/* ====================================================
+              COLUNA DIREITA: FORMULÁRIO DE LOGIN MONOCROMÁTICO
+              ==================================================== */}
+          <section className="bw-login-form-area">
+            <div className="bw-form-header">
+              <div className="bw-form-kicker">
+                <UserCheck size={14} /> Autenticação Corporativa
               </div>
               <h2>Acesso ao Sistema</h2>
-              <p>Insira suas credenciais corporativas para iniciar a sessão.</p>
+              <p>Insira suas credenciais corporativas para entrar.</p>
             </div>
 
             {state?.error && (
-              <div className="corp-alert-error" role="alert">
-                <div className="corp-alert-icon">!</div>
+              <div className="bw-alert-error" role="alert">
+                <div className="bw-alert-icon">!</div>
                 <div>
                   <strong>Falha na autenticação</strong>
                   <p>{state.error}</p>
@@ -220,22 +204,24 @@ export function LoginForm({
               </div>
             )}
 
-            <form action={action} className="corp-form-element">
+            <form action={action} className="bw-form-element">
               {/* Campo E-mail */}
-              <div className="corp-field">
-                <label htmlFor="corp-email">
-                  E-mail Corporativo <span className="corp-req">*</span>
+              <div className="bw-field">
+                <label htmlFor="bw-email">
+                  E-mail Corporativo <span className="bw-req">*</span>
                 </label>
-                <div className="corp-input-wrapper">
-                  <Mail size={17} className="corp-input-icon" />
+                <div className="bw-input-wrapper">
+                  <Mail size={16} className="bw-input-icon" />
                   <input
-                    id="corp-email"
+                    id="bw-email"
                     name="email"
                     type="email"
                     autoComplete="email"
                     placeholder="colaborador@empresa.com.br"
                     value={email}
                     onChange={(e) => handleEmailChange(e.target.value)}
+                    onFocus={() => setFocusField("email")}
+                    onBlur={() => setFocusField(null)}
                     required
                     autoFocus
                   />
@@ -243,37 +229,40 @@ export function LoginForm({
               </div>
 
               {/* Campo Senha */}
-              <div className="corp-field">
-                <div className="corp-label-row">
-                  <label htmlFor="corp-password">
-                    Senha de Acesso <span className="corp-req">*</span>
+              <div className="bw-field">
+                <div className="bw-label-row">
+                  <label htmlFor="bw-password">
+                    Senha de Acesso <span className="bw-req">*</span>
                   </label>
                   <button
                     type="button"
-                    className="corp-forgot-link"
+                    className="bw-forgot-link"
                     onClick={() => setShowHelpModal(true)}
                   >
                     Esqueceu a senha?
                   </button>
                 </div>
-                <div className="corp-input-wrapper">
-                  <Lock size={17} className="corp-input-icon" />
+                <div className="bw-input-wrapper">
+                  <Lock size={16} className="bw-input-icon" />
                   <input
-                    id="corp-password"
+                    id="bw-password"
                     name="password"
                     type={showPassword ? "text" : "password"}
                     autoComplete="current-password"
                     placeholder="••••••••••••"
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    onChange={(e) => handlePasswordChange(e.target.value)}
+                    onFocus={() => setFocusField("password")}
+                    onBlur={() => setFocusField(null)}
                     required
                   />
                   <button
                     type="button"
-                    className="corp-toggle-password"
+                    className="bw-toggle-password"
                     onClick={() => setShowPassword((v) => !v)}
                     tabIndex={-1}
                     aria-label={showPassword ? "Ocultar senha" : "Exibir senha"}
+                    title={showPassword ? "Ocultar senha (mascote cobre os olhos)" : "Mostrar senha (mascote espia)"}
                   >
                     {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
@@ -281,8 +270,8 @@ export function LoginForm({
               </div>
 
               {/* Opção Lembrar Usuário */}
-              <div className="corp-options-row">
-                <label className="corp-checkbox-label">
+              <div className="bw-options-row">
+                <label className="bw-checkbox-label">
                   <input
                     type="checkbox"
                     checked={rememberMe}
@@ -295,39 +284,39 @@ export function LoginForm({
               {/* Botão Entrar */}
               <button
                 type="submit"
-                className="corp-submit-btn"
+                className="bw-submit-btn"
                 disabled={pending}
               >
                 {pending ? (
                   <>
-                    <Loader2 size={18} className="corp-spin" /> Autenticando Credenciais...
+                    <Loader2 size={17} className="bw-spin" /> Autenticando...
                   </>
                 ) : (
                   <>
-                    Acessar Painel Corporativo <ArrowRight size={17} />
+                    Entrar no Sistema <ArrowRight size={16} />
                   </>
                 )}
               </button>
 
-              {/* Box de Acesso Rápido / Demonstração */}
-              <div className="corp-demo-card">
-                <div className="corp-demo-header">
-                  <span className="corp-demo-pill">
-                    <Sparkles size={12} /> Ambiente de Demonstração
+              {/* Acesso Rápido de Demonstração */}
+              <div className="bw-demo-card">
+                <div className="bw-demo-header">
+                  <span className="bw-demo-pill">
+                    <Sparkles size={11} /> Acesso de Homologação
                   </span>
-                  <span className="corp-demo-tip">Preenchimento automático</span>
+                  <span className="bw-demo-tip">Clique para preencher</span>
                 </div>
 
-                <div className="corp-demo-grid">
+                <div className="bw-demo-grid">
                   <button
                     type="button"
-                    className="corp-demo-chip admin"
+                    className="bw-demo-chip"
                     onClick={() => fillDemo("admin@empresa.com", "admin123")}
                   >
-                    <div className="corp-demo-chip-icon">
+                    <div className="bw-demo-chip-icon">
                       <KeyRound size={14} />
                     </div>
-                    <div className="corp-demo-chip-text">
+                    <div className="bw-demo-chip-text">
                       <strong>Administrador</strong>
                       <span>admin@empresa.com</span>
                     </div>
@@ -335,13 +324,13 @@ export function LoginForm({
 
                   <button
                     type="button"
-                    className="corp-demo-chip staff"
+                    className="bw-demo-chip"
                     onClick={() => fillDemo("func@empresa.com", "func123")}
                   >
-                    <div className="corp-demo-chip-icon">
+                    <div className="bw-demo-chip-icon">
                       <UserCheck size={14} />
                     </div>
-                    <div className="corp-demo-chip-text">
+                    <div className="bw-demo-chip-text">
                       <strong>Colaborador</strong>
                       <span>func@empresa.com</span>
                     </div>
@@ -350,58 +339,56 @@ export function LoginForm({
               </div>
             </form>
 
-            <div className="corp-form-footer">
+            <div className="bw-form-footer">
               <p>
-                <strong>Aviso de Segurança:</strong> O acesso a este sistema é monitorado e
-                restrito a colaboradores autorizados da empresa.
+                <strong>Ambiente Monitorado:</strong> Atividades de login são registradas em trilha de auditoria corporativa.
               </p>
             </div>
           </section>
         </div>
       </main>
 
-      {/* Modal / Dialog de Ajuda e Suporte de TI */}
+      {/* Modal Monocromático de Suporte & Redefinição de Senha */}
       {showHelpModal && (
-        <div className="corp-modal-overlay" onClick={() => setShowHelpModal(false)}>
+        <div className="bw-modal-overlay" onClick={() => setShowHelpModal(false)}>
           <div
-            className="corp-modal-card"
+            className="bw-modal-card"
             onClick={(e) => e.stopPropagation()}
             role="dialog"
             aria-modal="true"
           >
-            <div className="corp-modal-header">
-              <div className="corp-modal-title">
-                <HelpCircle size={20} color="#2563eb" />
+            <div className="bw-modal-header">
+              <div className="bw-modal-title">
+                <HelpCircle size={18} />
                 <h3>Suporte Corporativo & Redefinição de Senha</h3>
               </div>
               <button
                 type="button"
-                className="corp-modal-close"
+                className="bw-modal-close"
                 onClick={() => setShowHelpModal(false)}
               >
                 <X size={18} />
               </button>
             </div>
 
-            <div className="corp-modal-body">
+            <div className="bw-modal-body">
               <p>
-                Por motivos de conformidade e segurança corporativa, a redefinição de senhas de
-                acesso deve ser solicitada diretamente ao administrador do sistema ou ao time
-                interno de Tecnologia da Informação.
+                Por motivos de governança e proteção de dados (LGPD), a redefinição de senhas é
+                realizada diretamente pelo administrador do sistema ou pela equipe de TI.
               </p>
 
-              <div className="corp-contact-list">
+              <div className="bw-contact-list">
                 {companyEmail && (
-                  <div className="corp-contact-item">
+                  <div className="bw-contact-item">
                     <Mail size={16} />
                     <div>
-                      <small>E-mail Corporativo</small>
+                      <small>E-mail da Empresa</small>
                       <strong>{companyEmail}</strong>
                     </div>
                   </div>
                 )}
                 {companyPhone && (
-                  <div className="corp-contact-item">
+                  <div className="bw-contact-item">
                     <Phone size={16} />
                     <div>
                       <small>Telefone / Ramal</small>
@@ -410,10 +397,10 @@ export function LoginForm({
                   </div>
                 )}
                 {companyDocument && (
-                  <div className="corp-contact-item">
+                  <div className="bw-contact-item">
                     <Building2 size={16} />
                     <div>
-                      <small>Empresa</small>
+                      <small>Razão Social</small>
                       <strong>{companyName}</strong>
                     </div>
                   </div>
@@ -421,13 +408,13 @@ export function LoginForm({
               </div>
             </div>
 
-            <div className="corp-modal-footer">
+            <div className="bw-modal-footer">
               <button
                 type="button"
                 className="btn secondary"
                 onClick={() => setShowHelpModal(false)}
               >
-                Entendido, Voltar ao Login
+                Fechar
               </button>
             </div>
           </div>
