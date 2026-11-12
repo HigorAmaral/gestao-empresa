@@ -13,7 +13,7 @@ Projetado para pequenas, médias e grandes empresas com foco em alta performance
 
 ---
 
-## 📌 Sumário
+##  Sumário
 
 1. [Visão Geral dos Módulos](#-visão-geral-dos-módulos)
 2. [Principais Recursos & Inovações](#-principais-recursos--inovações)
@@ -27,7 +27,7 @@ Projetado para pequenas, médias e grandes empresas com foco em alta performance
 
 ---
 
-## 💼 Visão Geral dos Módulos
+##  Visão Geral dos Módulos
 
 | Módulo | Rota | Descrição e Funcionalidades |
 | :--- | :--- | :--- |
@@ -56,7 +56,7 @@ Projetado para pequenas, médias e grandes empresas com foco em alta performance
 
 ---
 
-## 🚀 Principais Recursos & Inovações
+##  Principais Recursos & Inovações
 
 - **PIX Dinâmico com QR Code Nativo (EMVCo BR Code):** Geração instantânea de Pix Copia e Cola nos recibos e nas ordens de serviço públicas sem dependência de gateways intermediários.
 - **Motor de Automações em Segundo Plano:** Executa cobranças recorrentes de contratos, checa estoques mínimos e programa manutenções automáticas (`/api/automations/run`).
@@ -67,7 +67,7 @@ Projetado para pequenas, médias e grandes empresas com foco em alta performance
 
 ---
 
-## 🛠️ Tecnologias Utilizadas
+##  Tecnologias Utilizadas
 
 - **Framework Web:** [Next.js 16](https://nextjs.org/) (Turbopack, Server Components & Server Actions)
 - **Biblioteca de UI:** [React 19](https://react.dev/) + [Lucide Icons](https://lucide.dev/)
@@ -79,7 +79,7 @@ Projetado para pequenas, médias e grandes empresas com foco em alta performance
 
 ---
 
-## 🗄️ Estrutura do Banco de Dados
+##  Estrutura do Banco de Dados
 
 ```mermaid
 erDiagram
@@ -124,7 +124,7 @@ erDiagram
 
 ---
 
-## 💻 Como Executar Localmente
+##  Como Executar Localmente
 
 ### Pré-requisitos
 - **Node.js** 18+ (recomendado LTS)
@@ -162,7 +162,7 @@ Acesse **http://localhost:3000** no seu navegador.
 
 ---
 
-## 🔑 Credenciais de Acesso
+##  Credenciais de Acesso
 
 O sistema dispõe de botões de preenchimento rápido de demonstração na tela de login (`/login`):
 
@@ -171,11 +171,11 @@ O sistema dispõe de botões de preenchimento rápido de demonstração na tela 
 | **Administrador** | `admin@empresa.com` | `admin123` | Acesso Irrestrito (todos os 22 módulos) |
 | **Funcionário** | `func@empresa.com` | `func123` | Operacional (Vendas, OS, Estoque, Clientes, Compras) |
 
-> 👑 O administrador proprietário registrado possui login prioritário com permissões globais de governança.
+> O administrador proprietário registrado possui login prioritário com permissões globais de governança.
 
 ---
 
-## 📜 Scripts Disponíveis
+##  Scripts Disponíveis
 
 | Comando | Descrição |
 | :--- | :--- |
@@ -190,7 +190,7 @@ O sistema dispõe de botões de preenchimento rápido de demonstração na tela 
 
 ---
 
-## 📂 Estrutura de Pastas
+##  Estrutura de Pastas
 
 ```text
 gestao-empresa/
@@ -236,7 +236,7 @@ gestao-empresa/
 
 ---
 
-## 🔒 Segurança e Governança
+##  Segurança e Governança
 
 - **RBAC (Controle de Acesso Baseado em Funções):** Separação estrita entre `ADMIN` e `FUNCIONARIO`, com controle granular de permissões por módulo.
 - **Trilha de Auditoria Contínua:** Registro inviolável de todas as ações de impacto no sistema com operador, ação e data/hora.
