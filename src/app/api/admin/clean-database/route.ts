@@ -12,14 +12,11 @@ export async function POST(req: NextRequest) {
 }
 
 async function handleReset(req: NextRequest) {
-  const secretKey = req.nextUrl.searchParams.get("key");
   const session = await getSession();
 
-  const isAuthorized = secretKey === "higor_reset_2026" || session?.role === "ADMIN";
-
-  if (!isAuthorized) {
+  if (session?.role !== "ADMIN") {
     return NextResponse.json(
-      { error: "Acesso não autorizado. É necessário login como administrador ou chave de segurança válida." },
+      { error: "Acesso restrito. É necessário estar autenticado como Administrador." },
       { status: 403 }
     );
   }
