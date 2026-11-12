@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { createSession, requireAdmin, requireUser } from "@/lib/auth";
-import { parsePermissions, serializePermissions } from "@/lib/permissions";
+import { getRoleDefinition, normalizeRole, parsePermissions, serializePermissions } from "@/lib/permissions";
 import { bool, reqStr, str, toFormError, ValidationError, type FormState } from "@/lib/form";
 
 export async function saveUser(id: number | null, _prev: FormState, fd: FormData): Promise<FormState> {
@@ -13,11 +13,17 @@ export async function saveUser(id: number | null, _prev: FormState, fd: FormData
   try {
     const name = reqStr(fd, "name", "Nome");
     const email = reqStr(fd, "email", "E-mail").toLowerCase();
-    const role = str(fd, "role") === "ADMIN" ? "ADMIN" : "FUNCIONARIO";
+    const role = normalizeRole(str(fd, "role"));
     const active = bool(fd, "active");
     const password = str(fd, "password");
     const rawPerms = fd.getAll("permissions").map(String);
-    const permissions = role === "ADMIN" ? "*" : serializePermissions(rawPerms);
+    const hasCustomPermsField = fd.has("permissionsCustomized");
+    const permissions =
+      role === "ADMIN"
+        ? "*"
+        : rawPerms.length > 0 || hasCustomPermsField
+          ? serializePermissions(rawPerms)
+          : serializePermissions(getRoleDefinition(role).modules);
 
     if (!id && !password) throw new ValidationError("Informe uma senha para o novo usuário.");
     if (password && password.length < 6) throw new ValidationError("A senha deve ter pelo menos 6 caracteres.");
@@ -45,7 +51,7 @@ export async function saveUser(id: number | null, _prev: FormState, fd: FormData
           userId: updated.id,
           name: updated.name,
           email: updated.email,
-          role: updated.role === "ADMIN" ? "ADMIN" : "FUNCIONARIO",
+          role: normalizeRole(updated.role),
           permissions: parsePermissions(updated.permissions, updated.role),
         });
       }

@@ -115,6 +115,10 @@ export function QualityDashboardClient({
   const [tab, setTab] = useState<"inspecoes" | "rncs" | "indicadores">(
     initialTab === "rncs" ? "rncs" : initialTab === "indicadores" ? "indicadores" : "inspecoes",
   );
+
+  useEffect(() => {
+    setTab(initialTab === "rncs" ? "rncs" : initialTab === "indicadores" ? "indicadores" : "inspecoes");
+  }, [initialTab]);
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [typeFilter, setTypeFilter] = useState<string>("");
   const [feedback, setFeedback] = useState<{ type: "ok" | "error"; text: string } | null>(null);

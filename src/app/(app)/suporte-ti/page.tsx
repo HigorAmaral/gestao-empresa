@@ -1,5 +1,5 @@
-import { getSession } from "@/lib/auth";
-import { redirect } from "next/navigation";
+import { requireModule } from "@/lib/auth";
+import { hasModuleAccess } from "@/lib/permissions";
 import { PageHeader } from "@/components/ui";
 import {
   getItTicketsList,
@@ -23,8 +23,7 @@ export default async function SuporteTiPage({
     tab?: string;
   }>;
 }) {
-  const session = await getSession();
-  if (!session) redirect("/login");
+  const session = await requireModule("ti");
 
   const params = await searchParams;
   const [{ tickets, metrics }, assets, health, securityData] = await Promise.all([
@@ -34,7 +33,7 @@ export default async function SuporteTiPage({
     getSecurityDashboardData(),
   ]);
 
-  const isAdmin = session.role === "ADMIN";
+  const isAdmin = session.role === "ADMIN" || hasModuleAccess(session, "ti");
 
   return (
     <>

@@ -1,4 +1,4 @@
-import { requireUser } from "@/lib/auth";
+import { requireModule } from "@/lib/auth";
 import { getQualityDashboardData } from "@/lib/quality";
 import { FlashMessages, PageHeader } from "@/components/ui";
 import { QualityDashboardClient } from "./QualityDashboardClient";
@@ -10,7 +10,7 @@ export default async function QualidadePage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  await requireUser();
+  await requireModule("qualidade");
   const [sp, data] = await Promise.all([searchParams, getQualityDashboardData()]);
   const initialTab = typeof sp.tab === "string" ? sp.tab : "inspecoes";
 

@@ -49,7 +49,7 @@ import {
 } from "lucide-react";
 import { logout } from "@/app/login/actions";
 import type { SidebarAlerts } from "@/lib/audit";
-import { hasModuleAccess, type ModuleKey } from "@/lib/permissions";
+import { getRoleDefinition, hasModuleAccess, type ModuleKey } from "@/lib/permissions";
 import type { Session } from "@/lib/token";
 import { GlobalSearch } from "./GlobalSearch";
 import { PwaInstallButton } from "./PwaManager";
@@ -91,7 +91,14 @@ const SECTIONS: { title: string; items: Item[] }[] = [
       { href: "/recebimento", label: "Recebimento", Icon: PackageCheck, moduleKey: "estoque" },
       { href: "/compras", label: "Compras", Icon: Receipt, moduleKey: "compras" },
       { href: "/fornecedores", label: "Fornecedores", Icon: Truck, moduleKey: "fornecedores" },
-      { href: "/qualidade", label: "Qualidade (SGQ)", Icon: Award, moduleKey: "qualidade", alertKey: "qualidade" },
+    ],
+  },
+  {
+    title: "Qualidade (SGQ)",
+    items: [
+      { href: "/qualidade", label: "Inspeções & Lotes", Icon: ClipboardCheck, moduleKey: "qualidade", alertKey: "qualidade" },
+      { href: "/qualidade?tab=rncs", label: "Não Conformidades (RNC)", Icon: ShieldAlert, moduleKey: "qualidade", subItem: true },
+      { href: "/qualidade?tab=indicadores", label: "Indicadores SGQ", Icon: Award, moduleKey: "qualidade", subItem: true },
     ],
   },
   {
@@ -147,7 +154,6 @@ export function Sidebar({
   notifications?: AppNotification[];
 }) {
   const pathname = usePathname();
-  const isAdmin = session.role === "ADMIN";
   const [dark, setDark] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
@@ -399,7 +405,7 @@ export function Sidebar({
         </nav>
         <div className="userbox">
           <div className="name">{session.name}</div>
-          <div className="role">{isAdmin ? "Administrador" : "Funcionário"}</div>
+          <div className="role">{getRoleDefinition(session.role).shortLabel}</div>
           <div className="links">
             <Link href="/perfil">
               <User size={13} /> Meu perfil

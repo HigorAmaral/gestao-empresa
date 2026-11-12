@@ -4,7 +4,7 @@ import { Printer } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
 import { toInputDate, todayInput } from "@/lib/format";
-import { parsePermissions } from "@/lib/permissions";
+import { normalizeRole, parsePermissions } from "@/lib/permissions";
 import { ensureStockLocationTables } from "@/lib/stock-location";
 import { PageHeader } from "@/components/ui";
 import { ActionForm } from "@/components/Forms";
@@ -31,7 +31,7 @@ export default async function FuncionarioPage({ params }: { params: Promise<{ id
     select: { department: true },
   });
 
-  const currentRole = employee?.user?.role === "ADMIN" ? "ADMIN" : "FUNCIONARIO";
+  const currentRole = normalizeRole(employee?.user?.role);
   const currentPermissions = parsePermissions(
     employee?.user?.permissions ?? employee?.permissions,
     currentRole,

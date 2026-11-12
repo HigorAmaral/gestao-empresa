@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
+import { hasModuleAccess } from "@/lib/permissions";
 import { logAudit } from "@/lib/audit";
 import { createItTicket, createItAsset, deleteItAsset } from "@/lib/it-tickets";
 import { ensureStockLocationTables } from "@/lib/stock-location";
@@ -85,8 +86,8 @@ export async function createInternalTicketAction(fd: FormData) {
 
 export async function deleteTicketAction(fd: FormData) {
   const session = await getSession();
-  if (!session || session.role !== "ADMIN") {
-    throw new Error("Apenas administradores podem excluir chamados de TI.");
+  if (!session || !hasModuleAccess(session, "ti")) {
+    throw new Error("Apenas administradores ou equipe de TI podem excluir chamados de TI.");
   }
 
   await ensureStockLocationTables();
@@ -110,7 +111,7 @@ export async function deleteTicketAction(fd: FormData) {
 
 export async function createAssetAction(fd: FormData) {
   const session = await getSession();
-  if (!session) throw new Error("Não autorizado.");
+  if (!session || !hasModuleAccess(session, "ti")) throw new Error("Não autorizado.");
 
   const assetTag = String(fd.get("assetTag") || "").trim();
   const name = String(fd.get("name") || "").trim();
@@ -148,8 +149,8 @@ export async function createAssetAction(fd: FormData) {
 
 export async function deleteAssetAction(fd: FormData) {
   const session = await getSession();
-  if (!session || session.role !== "ADMIN") {
-    throw new Error("Apenas administradores podem excluir ativos de TI.");
+  if (!session || !hasModuleAccess(session, "ti")) {
+    throw new Error("Apenas administradores ou equipe de TI podem excluir ativos de TI.");
   }
 
   const id = Number(fd.get("id"));

@@ -6,7 +6,11 @@ import {
   ALL_MODULE_KEYS,
   APP_MODULES,
   PERMISSION_PRESETS,
+  ROLE_DEFINITIONS,
+  getRoleDefinition,
+  normalizeRole,
   type ModuleKey,
+  type Role,
 } from "@/lib/permissions";
 
 export function PermissionsSelector({
@@ -16,15 +20,16 @@ export function PermissionsSelector({
   hasExistingUser = false,
 }: {
   defaultPermissions: ModuleKey[];
-  defaultRole?: "ADMIN" | "FUNCIONARIO";
+  defaultRole?: Role;
   mode?: "user" | "employee";
   hasExistingUser?: boolean;
 }) {
   const [enableLogin, setEnableLogin] = useState<boolean>(mode === "user" ? true : hasExistingUser);
-  const [role, setRole] = useState<"ADMIN" | "FUNCIONARIO">(defaultRole);
+  const [role, setRole] = useState<Role>(normalizeRole(defaultRole));
   const [selected, setSelected] = useState<Set<ModuleKey>>(new Set(defaultPermissions));
 
   const isAdmin = role === "ADMIN";
+  const currentRoleDef = getRoleDefinition(role);
 
   function toggleModule(key: ModuleKey) {
     if (isAdmin) return;
@@ -36,23 +41,31 @@ export function PermissionsSelector({
     });
   }
 
-  function applyPreset(keys: ModuleKey[]) {
-    setRole("FUNCIONARIO");
-    setSelected(new Set(keys));
+  function applyRolePreset(nextRole: Role, keys?: ModuleKey[]) {
+    setRole(nextRole);
+    const modules = keys ?? getRoleDefinition(nextRole).modules;
+    setSelected(new Set(modules));
   }
 
-  const sections = ["Comercial & Serviços", "Suprimentos", "Gestão & Sistema"] as const;
+  const sections = [
+    "Comercial & Serviços",
+    "Suprimentos",
+    "Qualidade (SGQ)",
+    "Gestão & Sistema",
+    "Tecnologia & TI",
+  ] as const;
 
   return (
     <div className="field s12" style={{ marginTop: 8 }}>
+      <input type="hidden" name="permissionsCustomized" value="1" />
       <div className="perm-box">
         <div className="perm-header">
           <div className="row" style={{ gap: 8 }}>
             <Shield size={18} />
             <div>
-              <h3 style={{ fontSize: 15, fontWeight: 700 }}>Controle de Acesso e Permissões de Módulos</h3>
+              <h3 style={{ fontSize: 15, fontWeight: 700 }}>Cargo, Perfil de Acesso e Permissões por Módulo</h3>
               <div className="muted small">
-                Defina exatamente quais áreas e menus do sistema este colaborador poderá acessar
+                Escolha um cargo com permissões pré-configuradas (Suporte TI, Suprimentos, Qualidade, etc.) ou ajuste módulo a módulo
               </div>
             </div>
           </div>
@@ -71,23 +84,26 @@ export function PermissionsSelector({
           )}
         </div>
 
-        {/* Campos de conta de acesso (Perfil e Senha) */}
+        {/* Campos de conta de acesso (Cargo/Perfil e Senha) */}
         {(mode === "user" || enableLogin) && (
           <div className="form-grid" style={{ marginBottom: 18, paddingTop: 14, borderTop: "1px solid var(--border)" }}>
             <div className="field s6">
-              <label>Nível do Perfil de Acesso</label>
+              <label htmlFor="role-select">Cargo / Perfil de Acesso</label>
               <select
+                id="role-select"
                 name="role"
                 value={role}
-                onChange={(e) => {
-                  const nextRole = e.target.value === "ADMIN" ? "ADMIN" : "FUNCIONARIO";
-                  setRole(nextRole);
-                  if (nextRole === "ADMIN") setSelected(new Set(ALL_MODULE_KEYS));
-                }}
+                onChange={(e) => applyRolePreset(normalizeRole(e.target.value))}
               >
-                <option value="FUNCIONARIO">Funcionário (Acesso controlado por módulos abaixo)</option>
-                <option value="ADMIN">Administrador (Acesso total a todo o sistema)</option>
+                {ROLE_DEFINITIONS.map((def) => (
+                  <option key={def.key} value={def.key}>
+                    {def.label}
+                  </option>
+                ))}
               </select>
+              <div className="muted small" style={{ marginTop: 4 }}>
+                {currentRoleDef.description}
+              </div>
             </div>
 
             {mode === "employee" && (
@@ -111,18 +127,18 @@ export function PermissionsSelector({
           </div>
         )}
 
-        {/* Atalhos Rápidos de Função (Presets) */}
+        {/* Atalhos Rápidos de Cargo (Presets) */}
         <div className="perm-presets">
           <div className="small bold muted" style={{ display: "flex", alignItems: "center", gap: 5 }}>
-            <Sparkles size={13} /> Perfis rápidos de função:
+            <Sparkles size={13} /> Cargos pré-configurados:
           </div>
           <div className="perm-preset-btns">
             {PERMISSION_PRESETS.map((preset) => (
               <button
-                key={preset.label}
+                key={preset.role}
                 type="button"
-                className="btn sm secondary"
-                onClick={() => applyPreset(preset.modules)}
+                className={`btn sm ${role === preset.role ? "" : "secondary"}`}
+                onClick={() => applyRolePreset(preset.role, preset.modules)}
                 title={preset.description}
               >
                 {preset.label}
@@ -131,10 +147,14 @@ export function PermissionsSelector({
             <button
               type="button"
               className="btn sm secondary"
-              onClick={() => {
-                setRole("FUNCIONARIO");
-                setSelected(new Set());
-              }}
+              onClick={() => applyRolePreset("FUNCIONARIO", ALL_MODULE_KEYS)}
+            >
+              Liberar Todos ({ALL_MODULE_KEYS.length})
+            </button>
+            <button
+              type="button"
+              className="btn sm secondary"
+              onClick={() => applyRolePreset("FUNCIONARIO", [])}
             >
               Desmarcar todos
             </button>
@@ -143,8 +163,8 @@ export function PermissionsSelector({
 
         {isAdmin && (
           <div className="alert info" style={{ marginTop: 12, marginBottom: 12 }}>
-            <Shield size={16} /> O perfil <strong>Administrador</strong> possui acesso irrestrito a todos os 13 módulos
-            do sistema. Mude para <strong>Funcionário</strong> caso queira restringir módulos específicos.
+            <Shield size={16} /> O cargo <strong>Administrador</strong> possui acesso irrestrito a todos os{" "}
+            {ALL_MODULE_KEYS.length} módulos do sistema. Selecione outro cargo caso queira restringir módulos específicos.
           </div>
         )}
 

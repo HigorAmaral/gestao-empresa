@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
-import { parsePermissions } from "@/lib/permissions";
+import { normalizeRole, parsePermissions } from "@/lib/permissions";
 import { PageHeader } from "@/components/ui";
 import { ActionForm } from "@/components/Forms";
 import { PermissionsSelector } from "@/components/PermissionsSelector";
@@ -15,7 +15,7 @@ export default async function UsuarioPage({ params }: { params: Promise<{ id: st
   const user = isNew ? null : await prisma.user.findUnique({ where: { id: Number(id) } });
   if (!isNew && !user) notFound();
 
-  const currentRole = user?.role === "ADMIN" ? "ADMIN" : "FUNCIONARIO";
+  const currentRole = normalizeRole(user?.role);
   const currentPermissions = parsePermissions(user?.permissions, currentRole);
 
   return (

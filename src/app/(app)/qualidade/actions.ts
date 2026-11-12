@@ -2,7 +2,7 @@
 
 import { revalidatePath, revalidateTag } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { requireUser } from "@/lib/auth";
+import { requireModule } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { ensureStockLocationTables } from "@/lib/stock-location";
 import {
@@ -20,7 +20,7 @@ function revalidateQuality() {
 }
 
 export async function createInspectionAction(formData: FormData) {
-  const session = await requireUser();
+  const session = await requireModule("qualidade");
   await ensureStockLocationTables();
 
   const type = String(formData.get("type") || "PRODUCAO").trim();
@@ -67,7 +67,7 @@ export async function completeInspectionAction(input: {
   checklist: QualityChecklistItem[];
   notes?: string;
 }) {
-  const session = await requireUser();
+  const session = await requireModule("qualidade");
   await ensureStockLocationTables();
 
   const insp = await prisma.qualityInspection.findUnique({
@@ -143,7 +143,7 @@ export async function completeInspectionAction(input: {
 }
 
 export async function createRncAction(formData: FormData) {
-  const session = await requireUser();
+  const session = await requireModule("qualidade");
   await ensureStockLocationTables();
 
   const title = String(formData.get("title") || "").trim();
@@ -184,7 +184,7 @@ export async function createRncAction(formData: FormData) {
 }
 
 export async function updateRncAction(formData: FormData) {
-  const session = await requireUser();
+  const session = await requireModule("qualidade");
   await ensureStockLocationTables();
 
   const id = Number(formData.get("id"));

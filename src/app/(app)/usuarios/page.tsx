@@ -34,8 +34,9 @@ export default async function UsuariosPage({ searchParams }: { searchParams: SP 
       <FlashMessages sp={sp} />
       <div className="alert info">
         <div>
-          <strong>Administrador</strong>: acesso total a todos os 13 módulos. <strong>Funcionário</strong>: acesso
-          personalizado por módulo (escolha exatamente quais menus cada colaborador pode ver e acessar).
+          <strong>Administrador</strong>: acesso total a todos os {ALL_MODULE_KEYS.length} módulos.{" "}
+          <strong>Cargos pré-configurados</strong> (<em>Suporte TI</em>, <em>Suprimentos</em>, <em>Qualidade</em>,{" "}
+          <em>Vendedor</em>, etc.): já liberam os módulos do setor automaticamente, com ajuste fino opcional por usuário.
         </div>
       </div>
       <div className="card flush">

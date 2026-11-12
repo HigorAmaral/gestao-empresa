@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { createSession, destroySession } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
-import { parsePermissions } from "@/lib/permissions";
+import { normalizeRole, parsePermissions } from "@/lib/permissions";
 import {
   checkBruteForceLockout,
   recordFailedLoginAttempt,
@@ -84,7 +84,7 @@ export async function login(_prev: FormState, fd: FormData): Promise<FormState> 
   // 3. Sucesso: Limpa contadores de tentativas
   await Promise.all([clearLoginAttempts(email), clearLoginAttempts(ip)]);
 
-  const role = (user.role === "ADMIN" ? "ADMIN" : "FUNCIONARIO") as "ADMIN" | "FUNCIONARIO";
+  const role = normalizeRole(user.role);
   const session = {
     userId: user.id,
     name: user.name,

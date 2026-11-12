@@ -1,10 +1,10 @@
 import { SignJWT, jwtVerify } from "jose";
-import { parsePermissions, type ModuleKey } from "./permissions";
+import { normalizeRole, parsePermissions, type ModuleKey, type Role } from "./permissions";
+
+export type { Role };
 
 export const SESSION_COOKIE = "session";
 export const SESSION_HOURS = 8;
-
-export type Role = "ADMIN" | "FUNCIONARIO";
 
 export type Session = {
   userId: number;
@@ -29,7 +29,7 @@ export async function signToken(session: Session) {
 export async function verifyToken(token: string): Promise<Session | null> {
   try {
     const { payload } = await jwtVerify(token, secretKey());
-    const role: Role = payload.role === "ADMIN" ? "ADMIN" : "FUNCIONARIO";
+    const role: Role = normalizeRole(typeof payload.role === "string" ? payload.role : undefined);
     const rawPerms = Array.isArray(payload.permissions)
       ? payload.permissions.join(",")
       : typeof payload.permissions === "string"

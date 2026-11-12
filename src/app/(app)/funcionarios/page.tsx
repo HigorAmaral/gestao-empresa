@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
 import { pageParams, spStr } from "@/lib/form";
 import { brl, fmtDate, todayInput } from "@/lib/format";
-import { ALL_MODULE_KEYS, parsePermissions } from "@/lib/permissions";
+import { ALL_MODULE_KEYS, getRoleDefinition, parsePermissions } from "@/lib/permissions";
 import { ensureStockLocationTables } from "@/lib/stock-location";
 import { calculateCompletePayslip } from "@/lib/rh-calc";
 import { ActiveBadge, ExportCsvButton, FlashMessages, PageHeader, Pagination } from "@/components/ui";
@@ -174,7 +174,7 @@ export default async function FuncionariosPage({ searchParams }: { searchParams:
                       {hasLogin ? (
                         <div>
                           <span className="badge green">
-                            <KeyRound size={11} /> {role === "ADMIN" ? "Admin (Total)" : "Login Ativo"}
+                            <KeyRound size={11} /> {getRoleDefinition(role).shortLabel}
                           </span>
                           <div className="muted small" style={{ marginTop: 3 }}>
                             <Shield size={11} className="icon-inline" /> {perms.length} de {ALL_MODULE_KEYS.length} módulos

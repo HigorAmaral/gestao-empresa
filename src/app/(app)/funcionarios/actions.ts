@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
-import { serializePermissions } from "@/lib/permissions";
+import { getRoleDefinition, normalizeRole, serializePermissions } from "@/lib/permissions";
 import { bool, dateVal, num, reqStr, str, toFormError, ValidationError, type FormState } from "@/lib/form";
 import { calculateCompletePayslip, computeDayMinutes, parseAfdContent } from "@/lib/rh-calc";
 import { processPayrollForMonth } from "@/lib/payroll";
@@ -24,10 +24,16 @@ export async function saveEmployee(id: number | null, _prev: FormState, fd: Form
     const active = bool(fd, "active");
 
     const enableLogin = bool(fd, "enableLogin");
-    const role = str(fd, "role") === "ADMIN" ? "ADMIN" : "FUNCIONARIO";
+    const role = normalizeRole(str(fd, "role"));
     const loginPassword = str(fd, "loginPassword");
     const rawPerms = fd.getAll("permissions").map(String);
-    const permissions = role === "ADMIN" ? "*" : serializePermissions(rawPerms);
+    const hasCustomPermsField = fd.has("permissionsCustomized");
+    const permissions =
+      role === "ADMIN"
+        ? "*"
+        : rawPerms.length > 0 || hasCustomPermsField
+          ? serializePermissions(rawPerms)
+          : serializePermissions(getRoleDefinition(role).modules);
 
     const existingEmp = id
       ? await prisma.employee.findUnique({ where: { id }, include: { user: true } })

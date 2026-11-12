@@ -15,11 +15,27 @@ export type ModuleKey =
   | "qualidade"
   | "ti";
 
+export type Role =
+  | "ADMIN"
+  | "SUPORTE"
+  | "SUPRIMENTOS"
+  | "QUALIDADE"
+  | "VENDEDOR"
+  | "TECNICO_OS"
+  | "FINANCEIRO"
+  | "RH"
+  | "FUNCIONARIO";
+
 export type ModuleInfo = {
   key: ModuleKey;
   label: string;
   href: string;
-  section: "Comercial & Serviços" | "Suprimentos" | "Gestão & Sistema" | "Tecnologia & TI";
+  section:
+    | "Comercial & Serviços"
+    | "Suprimentos"
+    | "Qualidade (SGQ)"
+    | "Gestão & Sistema"
+    | "Tecnologia & TI";
   description: string;
 };
 
@@ -56,17 +72,17 @@ export const APP_MODULES: ModuleInfo[] = [
   },
   {
     key: "estoque",
-    label: "Estoque",
-    href: " /estoque".trim(),
+    label: "Estoque & Recebimento",
+    href: "/estoque",
     section: "Suprimentos",
-    description: "Controlar entradas, saídas, ajustes e saldos mínimos.",
+    description: "Controlar almoxarifado, endereçamento, inventário e recebimento de mercadorias.",
   },
   {
     key: "compras",
     label: "Compras",
     href: "/compras",
     section: "Suprimentos",
-    description: "Registrar pedidos de compra e recebimento de mercadorias.",
+    description: "Registrar pedidos de compra e reposição de suprimentos.",
   },
   {
     key: "fornecedores",
@@ -75,11 +91,12 @@ export const APP_MODULES: ModuleInfo[] = [
     section: "Suprimentos",
     description: "Gerenciar cadastro e contatos de fornecedores.",
   },
+  // Qualidade (SGQ)
   {
     key: "qualidade",
     label: "Qualidade (SGQ)",
     href: "/qualidade",
-    section: "Suprimentos",
+    section: "Qualidade (SGQ)",
     description: "Inspeções de qualidade, checklists de lote e Não Conformidades (RNC/CAPA).",
   },
   // Gestão & Sistema
@@ -149,55 +166,121 @@ export const DEFAULT_EMPLOYEE_MODULES: ModuleKey[] = [
 
 export const DEFAULT_PERMISSIONS_STRING = DEFAULT_EMPLOYEE_MODULES.join(",");
 
-export const PERMISSION_PRESETS: { label: string; description: string; modules: ModuleKey[] }[] = [
+export type RoleDefinition = {
+  key: Role;
+  label: string;
+  shortLabel: string;
+  description: string;
+  defaultDepartment: string;
+  modules: ModuleKey[];
+};
+
+export const ROLE_DEFINITIONS: RoleDefinition[] = [
   {
-    label: "Vendedor / Balcão",
-    description: "Vendas, Clientes e Produtos",
-    modules: ["vendas", "clientes", "produtos"],
-  },
-  {
-    label: "Técnico de OS",
-    description: "Ordens de Serviço, Clientes, Produtos e Estoque",
-    modules: ["os", "clientes", "produtos", "estoque"],
-  },
-  {
-    label: "Estoquista / Compras",
-    description: "Produtos, Estoque, Compras e Fornecedores",
-    modules: ["produtos", "estoque", "compras", "fornecedores"],
-  },
-  {
-    label: "Financeiro / Administrativo",
-    description: "Financeiro, Relatórios, Vendas, Compras e Clientes",
-    modules: ["financeiro", "relatorios", "vendas", "compras", "clientes"],
-  },
-  {
-    label: "Operacional Completo",
-    description: "Todos os módulos comerciais e de suprimentos",
-    modules: DEFAULT_EMPLOYEE_MODULES,
-  },
-  {
-    label: "Equipe de TI / Suporte",
-    description: "Acesso reservado ao departamento de TI, ativos e monitoramento",
+    key: "SUPORTE",
+    label: "Suporte (TI & Infraestrutura)",
+    shortLabel: "Suporte (TI)",
+    description: "Acesso completo à Central de TI, ativos, segurança WAF, usuários e auditoria.",
+    defaultDepartment: "Tecnologia da Informação (TI)",
     modules: ["ti", "usuarios", "auditoria"],
   },
   {
-    label: "Qualidade / SGQ",
-    description: "Inspeções, RNCs, Produção, Recebimento e Produtos",
+    key: "SUPRIMENTOS",
+    label: "Suprimentos (Almoxarifado & Recebimento)",
+    shortLabel: "Suprimentos",
+    description: "Almoxarifado, endereçamento, inventário físico, recebimento de mercadorias, compras, produtos e fornecedores.",
+    defaultDepartment: "Suprimentos / Almoxarifado",
+    modules: ["estoque", "compras", "produtos", "fornecedores"],
+  },
+  {
+    key: "QUALIDADE",
+    label: "Qualidade (SGQ)",
+    shortLabel: "Qualidade (SGQ)",
+    description: "Área da Qualidade: inspeções de recebimento/produção, RNCs, CAPA, produtos e estoque.",
+    defaultDepartment: "Qualidade (SGQ)",
     modules: ["qualidade", "produtos", "estoque", "os"],
   },
   {
-    label: "Liberar Todos",
-    description: "Acesso a todos os 15 módulos",
+    key: "VENDEDOR",
+    label: "Vendedor / Comercial & PDV",
+    shortLabel: "Vendedor",
+    description: "PDV, vendas, funil CRM, clientes e consulta de produtos.",
+    defaultDepartment: "Comercial / Vendas",
+    modules: ["vendas", "clientes", "produtos"],
+  },
+  {
+    key: "TECNICO_OS",
+    label: "Técnico de OS & Produção",
+    shortLabel: "Técnico OS",
+    description: "Ordens de serviço, ordens de produção, clientes, produtos e estoque.",
+    defaultDepartment: "Operações / Assistência Técnica",
+    modules: ["os", "clientes", "produtos", "estoque"],
+  },
+  {
+    key: "FINANCEIRO",
+    label: "Financeiro / Administrativo",
+    shortLabel: "Financeiro",
+    description: "Financeiro, conciliação OFX, relatórios/DRE, compras, vendas e clientes.",
+    defaultDepartment: "Financeiro / Administrativo",
+    modules: ["financeiro", "relatorios", "vendas", "compras", "clientes"],
+  },
+  {
+    key: "RH",
+    label: "RH / Departamento Pessoal",
+    shortLabel: "RH",
+    description: "Prontuários, folha de pagamento, ponto REP, férias, SST e relatórios.",
+    defaultDepartment: "Recursos Humanos",
+    modules: ["funcionarios", "relatorios"],
+  },
+  {
+    key: "FUNCIONARIO",
+    label: "Funcionário (Personalizado)",
+    shortLabel: "Funcionário",
+    description: "Acesso operacional padrão ou customizado manualmente por módulo.",
+    defaultDepartment: "",
+    modules: DEFAULT_EMPLOYEE_MODULES,
+  },
+  {
+    key: "ADMIN",
+    label: "Administrador (Acesso Total)",
+    shortLabel: "Administrador",
+    description: "Acesso irrestrito a todos os módulos e configurações do sistema.",
+    defaultDepartment: "Diretoria / Administração",
     modules: ALL_MODULE_KEYS,
   },
 ];
 
+const ROLE_BY_KEY = new Map<string, RoleDefinition>(ROLE_DEFINITIONS.map((r) => [r.key, r]));
+
+export function normalizeRole(raw?: string | null): Role {
+  const key = (raw || "").trim().toUpperCase();
+  if (ROLE_BY_KEY.has(key)) return key as Role;
+  return "FUNCIONARIO";
+}
+
+export function getRoleDefinition(role?: string | null): RoleDefinition {
+  return ROLE_BY_KEY.get(normalizeRole(role)) ?? ROLE_BY_KEY.get("FUNCIONARIO")!;
+}
+
+export const PERMISSION_PRESETS: {
+  role: Role;
+  label: string;
+  description: string;
+  modules: ModuleKey[];
+}[] = ROLE_DEFINITIONS.filter((r) => r.key !== "FUNCIONARIO" && r.key !== "ADMIN").map((r) => ({
+  role: r.key,
+  label: r.shortLabel,
+  description: r.description,
+  modules: r.modules,
+}));
+
 const VALID_SET = new Set<string>(ALL_MODULE_KEYS);
 
 export function parsePermissions(raw: string | null | undefined, role?: string): ModuleKey[] {
-  if (role === "ADMIN") return ALL_MODULE_KEYS;
+  const normalizedRole = normalizeRole(role);
+  if (normalizedRole === "ADMIN") return ALL_MODULE_KEYS;
   if (raw === "*") return ALL_MODULE_KEYS;
-  if (raw === null || raw === undefined) return DEFAULT_EMPLOYEE_MODULES;
+  if (raw === null || raw === undefined) return getRoleDefinition(normalizedRole).modules;
   if (raw.trim() === "") return [];
   return raw
     .split(",")
