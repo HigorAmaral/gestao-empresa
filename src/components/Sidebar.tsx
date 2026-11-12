@@ -26,6 +26,7 @@ import {
   Moon,
   Package,
   PackageCheck,
+  PanelLeftClose,
   Receipt,
   Search,
   Server,
@@ -248,7 +249,7 @@ export function Sidebar({
             {brandName}
           </span>
         </div>
-        <div className="row" style={{ gap: 6 }}>
+        <div className="brand-actions" style={{ gap: 6 }}>
           <NotificationsCenter notifications={notifications} />
           <button
             type="button"
@@ -261,7 +262,7 @@ export function Sidebar({
             title="Buscar (Ctrl+K)"
             aria-label="Pesquisar"
           >
-            <Search size={15} />
+            <Search size={14} />
           </button>
           <button
             type="button"
@@ -270,7 +271,7 @@ export function Sidebar({
             title={dark ? "Modo claro" : "Modo escuro"}
             aria-label="Alternar tema claro/escuro"
           >
-            {dark ? <Sun size={15} /> : <Moon size={15} />}
+            {dark ? <Sun size={14} /> : <Moon size={14} />}
           </button>
           <button
             type="button"
@@ -278,7 +279,7 @@ export function Sidebar({
             onClick={() => setDrawerOpen((v) => !v)}
             aria-label={drawerOpen ? "Fechar menu" : "Abrir menu"}
           >
-            {drawerOpen ? <X size={17} /> : <Menu size={17} />}
+            {drawerOpen ? <X size={16} /> : <Menu size={16} />}
           </button>
         </div>
       </header>
@@ -294,25 +295,25 @@ export function Sidebar({
                 src={logoUrl}
                 alt={brandName}
                 style={{
-                  width: 42,
-                  height: 42,
+                  width: 34,
+                  height: 34,
                   borderRadius: 8,
                   background: "#ffffff",
                   objectFit: "contain",
-                  padding: 3,
+                  padding: 2,
                   flexShrink: 0,
                 }}
               />
             ) : (
-              <div className="logo" style={{ width: 40, height: 40 }}>
-                <Building2 size={20} strokeWidth={2.2} />
+              <div className="logo" style={{ width: 34, height: 34 }}>
+                <Building2 size={18} strokeWidth={2.2} />
               </div>
             )}
-            <span style={{ fontSize: 16.5, maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            <span className="brand-title" title={brandName}>
               {brandName}
             </span>
           </div>
-          <div className="row" style={{ gap: 6 }}>
+          <div className="brand-actions">
             <NotificationsCenter notifications={notifications} />
             <button
               type="button"
@@ -320,16 +321,19 @@ export function Sidebar({
               onClick={toggleTheme}
               title={dark ? "Alternar para modo claro (P&B)" : "Alternar para modo escuro (P&B)"}
             >
-              {dark ? <Sun size={15} /> : <Moon size={15} />}
+              {dark ? <Sun size={14} /> : <Moon size={14} />}
             </button>
             <button
               type="button"
               className="theme-btn sidebar-close-btn"
-              onClick={handleCollapse}
-              aria-label="Recolher menu lateral"
-              title="Recolher menu lateral (X)"
+              onClick={() => {
+                if (drawerOpen) setDrawerOpen(false);
+                else handleCollapse();
+              }}
+              aria-label={drawerOpen ? "Fechar menu lateral" : "Recolher menu lateral"}
+              title={drawerOpen ? "Fechar menu lateral" : "Recolher menu lateral"}
             >
-              <X size={16} />
+              {drawerOpen ? <X size={15} /> : <PanelLeftClose size={15} />}
             </button>
           </div>
         </div>
