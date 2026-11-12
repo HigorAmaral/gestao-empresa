@@ -11,13 +11,14 @@ export type ModuleKey =
   | "relatorios"
   | "usuarios"
   | "auditoria"
-  | "configuracoes";
+  | "configuracoes"
+  | "ti";
 
 export type ModuleInfo = {
   key: ModuleKey;
   label: string;
   href: string;
-  section: "Comercial & Serviços" | "Suprimentos" | "Gestão & Sistema";
+  section: "Comercial & Serviços" | "Suprimentos" | "Gestão & Sistema" | "Tecnologia & TI";
   description: string;
 };
 
@@ -116,6 +117,14 @@ export const APP_MODULES: ModuleInfo[] = [
     section: "Gestão & Sistema",
     description: "Dados cadastrais da empresa, CNPJ e rodapé de recibos.",
   },
+  // Tecnologia & TI (Área Reservada)
+  {
+    key: "ti",
+    label: "Departamento de TI",
+    href: "/suporte-ti",
+    section: "Tecnologia & TI",
+    description: "Helpdesk corporativo, inventário de ativos, procedimentos e monitoramento de infraestrutura.",
+  },
 ];
 
 export const ALL_MODULE_KEYS: ModuleKey[] = APP_MODULES.map((m) => m.key);
@@ -157,6 +166,11 @@ export const PERMISSION_PRESETS: { label: string; description: string; modules: 
     label: "Operacional Completo",
     description: "Todos os módulos comerciais e de suprimentos",
     modules: DEFAULT_EMPLOYEE_MODULES,
+  },
+  {
+    label: "Equipe de TI / Suporte",
+    description: "Acesso reservado ao departamento de TI, ativos e monitoramento",
+    modules: ["ti", "usuarios", "auditoria"],
   },
   {
     label: "Liberar Todos",
@@ -201,10 +215,12 @@ export function canAccessPath(
     pathname === "/" ||
     pathname === "/login" ||
     pathname.startsWith("/perfil") ||
-    pathname.startsWith("/suporte-ti") ||
     pathname.startsWith("/api")
   ) {
     return true;
+  }
+  if (pathname === "/suporte-ti" || pathname.startsWith("/suporte-ti/")) {
+    return hasModuleAccess(session, "ti");
   }
   if (pathname === "/pdv" || pathname.startsWith("/pdv/") || pathname === "/nfe" || pathname.startsWith("/nfe/")) {
     return hasModuleAccess(session, "vendas");

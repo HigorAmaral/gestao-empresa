@@ -97,3 +97,78 @@ export async function getItTicketsList(filters?: {
     },
   };
 }
+
+export interface CreateAssetInput {
+  assetTag: string;
+  name: string;
+  category: string;
+  serialNumber?: string;
+  assignedUser?: string;
+  department?: string;
+  status?: string;
+  specifications?: string;
+  notes?: string;
+}
+
+export async function createItAsset(input: CreateAssetInput) {
+  await ensureStockLocationTables();
+  const assetTag = input.assetTag.trim();
+  const name = input.name.trim();
+  if (!assetTag || !name) throw new Error("Patrimônio e nome do ativo são obrigatórios.");
+
+  return (prisma as any).itAsset.create({
+    data: {
+      assetTag,
+      name,
+      category: input.category || "NOTEBOOK",
+      serialNumber: input.serialNumber?.trim() || null,
+      assignedUser: input.assignedUser?.trim() || null,
+      department: input.department?.trim() || null,
+      status: input.status || "EM_USO",
+      specifications: input.specifications?.trim() || null,
+      notes: input.notes?.trim() || null,
+    },
+  });
+}
+
+export async function getItAssetsList() {
+  await ensureStockLocationTables();
+  const assets = await (prisma as any).itAsset.findMany({
+    orderBy: [{ status: "asc" }, { assetTag: "asc" }],
+  });
+  return assets;
+}
+
+export async function deleteItAsset(id: number) {
+  await ensureStockLocationTables();
+  return (prisma as any).itAsset.delete({ where: { id } });
+}
+
+export async function getSystemHealthMetrics() {
+  await ensureStockLocationTables();
+  const t0 = Date.now();
+  try {
+    await prisma.$queryRawUnsafe(`SELECT 1`);
+  } catch {}
+  const dbLatencyMs = Math.max(1, Date.now() - t0);
+
+  const [ticketsCount, auditCount, usersCount] = await Promise.all([
+    (prisma as any).itTicket.count().catch(() => 0),
+    prisma.auditLog.count().catch(() => 0),
+    prisma.user.count().catch(() => 0),
+  ]);
+
+  return {
+    dbStatus: "OPERACIONAL",
+    dbLatencyMs,
+    dbType: "PostgreSQL (Neon Cloud Serverless)",
+    nextVersion: "16.4.6 (Turbopack Engine)",
+    nodeVersion: process.version,
+    memoryUsageMb: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+    uptimeMinutes: Math.round(process.uptime() / 60),
+    ticketsCount,
+    auditCount,
+    usersCount,
+    environment: process.env.NODE_ENV || "production",
+  };
+}

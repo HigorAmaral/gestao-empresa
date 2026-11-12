@@ -14,7 +14,7 @@ let tablesChecked = false;
  * Com a versão gravada no banco, cada cold start faz apenas 1 consulta rápida
  * em vez de ~90 comandos DDL sequenciais (principal causa de lentidão nas páginas).
  */
-const SCHEMA_VERSION = 16;
+const SCHEMA_VERSION = 17;
 let inflight: Promise<void> | null = null;
 
 export async function ensureStockLocationTables(): Promise<void> {
@@ -102,6 +102,23 @@ async function runSchemaSetup(): Promise<void> {
         "solutionNotes" TEXT,
         "assignedTo" TEXT,
         "resolvedAt" TIMESTAMP(3),
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `).catch(() => {});
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "ItAsset" (
+        "id" SERIAL PRIMARY KEY,
+        "assetTag" TEXT NOT NULL UNIQUE,
+        "name" TEXT NOT NULL,
+        "category" TEXT NOT NULL DEFAULT 'NOTEBOOK',
+        "serialNumber" TEXT,
+        "assignedUser" TEXT,
+        "department" TEXT,
+        "status" TEXT NOT NULL DEFAULT 'EM_USO',
+        "specifications" TEXT,
+        "purchaseDate" TIMESTAMP(3),
+        "notes" TEXT,
         "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
         "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
       );
@@ -972,6 +989,23 @@ async function runSchemaSetup(): Promise<void> {
         );
       `);
       await prisma.$executeRawUnsafe(`
+        CREATE TABLE IF NOT EXISTS "ItAsset" (
+          "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+          "assetTag" TEXT NOT NULL UNIQUE,
+          "name" TEXT NOT NULL,
+          "category" TEXT NOT NULL DEFAULT 'NOTEBOOK',
+          "serialNumber" TEXT,
+          "assignedUser" TEXT,
+          "department" TEXT,
+          "status" TEXT NOT NULL DEFAULT 'EM_USO',
+          "specifications" TEXT,
+          "purchaseDate" DATETIME,
+          "notes" TEXT,
+          "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+      await prisma.$executeRawUnsafe(`
         CREATE TABLE IF NOT EXISTS "InvoiceItem" (
           "id" INTEGER PRIMARY KEY AUTOINCREMENT,
           "invoiceId" INTEGER NOT NULL REFERENCES "Invoice"("id") ON DELETE CASCADE,
@@ -1012,6 +1046,23 @@ async function runSchemaSetup(): Promise<void> {
           "solutionNotes" TEXT,
           "assignedTo" TEXT,
           "resolvedAt" DATETIME,
+          "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+      await prisma.$executeRawUnsafe(`
+        CREATE TABLE IF NOT EXISTS "ItAsset" (
+          "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+          "assetTag" TEXT NOT NULL UNIQUE,
+          "name" TEXT NOT NULL,
+          "category" TEXT NOT NULL DEFAULT 'NOTEBOOK',
+          "serialNumber" TEXT,
+          "assignedUser" TEXT,
+          "department" TEXT,
+          "status" TEXT NOT NULL DEFAULT 'EM_USO',
+          "specifications" TEXT,
+          "purchaseDate" DATETIME,
+          "notes" TEXT,
           "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
           "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
         );

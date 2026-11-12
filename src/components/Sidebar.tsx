@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
   BarChart3,
+  BookOpen,
   Building2,
   Calendar,
   ChevronRight,
@@ -16,6 +17,7 @@ import {
   Headphones,
   HeartPulse,
   History,
+  Laptop,
   LayoutDashboard,
   LogOut,
   MapPin,
@@ -26,6 +28,7 @@ import {
   PackageCheck,
   Receipt,
   Search,
+  Server,
   Settings,
   ShieldCheck,
   ShoppingCart,
@@ -108,10 +111,18 @@ const SECTIONS: { title: string; items: Item[] }[] = [
         alertKey: "financeiro",
       },
       { href: "/relatorios", label: "Relatórios", Icon: BarChart3, moduleKey: "relatorios" },
-      { href: "/suporte-ti", label: "Chamados de TI", Icon: Headphones },
       { href: "/usuarios", label: "Usuários", Icon: ShieldCheck, moduleKey: "usuarios" },
       { href: "/auditoria", label: "Auditoria", Icon: History, moduleKey: "auditoria" },
       { href: "/configuracoes", label: "Configurações", Icon: Settings, moduleKey: "configuracoes" },
+    ],
+  },
+  {
+    title: "Tecnologia & TI (Reservado)",
+    items: [
+      { href: "/suporte-ti", label: "Central de Chamados TI", Icon: Headphones, moduleKey: "ti" },
+      { href: "/suporte-ti?tab=ativos", label: "Inventário de Ativos", Icon: Laptop, moduleKey: "ti", subItem: true },
+      { href: "/suporte-ti?tab=infra", label: "Saúde & Infraestrutura", Icon: Server, moduleKey: "ti", subItem: true },
+      { href: "/suporte-ti?tab=kb", label: "Base de Conhecimento", Icon: BookOpen, moduleKey: "ti", subItem: true },
     ],
   },
 ];

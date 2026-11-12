@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
-import { createItTicket } from "@/lib/it-tickets";
+import { createItTicket, createItAsset, deleteItAsset } from "@/lib/it-tickets";
 import { ensureStockLocationTables } from "@/lib/stock-location";
 
 export async function updateTicketStatusAction(fd: FormData) {
@@ -101,6 +101,65 @@ export async function deleteTicketAction(fd: FormData) {
     "TI",
     "EXCLUIR",
     `Excluiu chamado ${deleted.ticketNumber}`,
+    id
+  );
+
+  revalidatePath("/suporte-ti");
+  return { success: true };
+}
+
+export async function createAssetAction(fd: FormData) {
+  const session = await getSession();
+  if (!session) throw new Error("Não autorizado.");
+
+  const assetTag = String(fd.get("assetTag") || "").trim();
+  const name = String(fd.get("name") || "").trim();
+  const category = String(fd.get("category") || "NOTEBOOK");
+  const serialNumber = String(fd.get("serialNumber") || "").trim();
+  const assignedUser = String(fd.get("assignedUser") || "").trim();
+  const department = String(fd.get("department") || "").trim();
+  const status = String(fd.get("status") || "EM_USO");
+  const specifications = String(fd.get("specifications") || "").trim();
+  const notes = String(fd.get("notes") || "").trim();
+
+  const asset = await createItAsset({
+    assetTag,
+    name,
+    category,
+    serialNumber,
+    assignedUser,
+    department,
+    status,
+    specifications,
+    notes,
+  });
+
+  await logAudit(
+    session,
+    "TI",
+    "CRIAR",
+    `Cadastrou ativo de TI ${asset.assetTag} (${asset.name})`,
+    asset.id
+  );
+
+  revalidatePath("/suporte-ti");
+  return { success: true };
+}
+
+export async function deleteAssetAction(fd: FormData) {
+  const session = await getSession();
+  if (!session || session.role !== "ADMIN") {
+    throw new Error("Apenas administradores podem excluir ativos de TI.");
+  }
+
+  const id = Number(fd.get("id"));
+  const asset = await deleteItAsset(id);
+
+  await logAudit(
+    session,
+    "TI",
+    "EXCLUIR",
+    `Excluiu ativo de TI ${asset.assetTag} (${asset.name})`,
     id
   );
 

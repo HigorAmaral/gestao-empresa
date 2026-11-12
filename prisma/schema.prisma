@@ -719,5 +719,23 @@ model ItTicket {
   updatedAt      DateTime  @updatedAt
 }
 
+// ---------- Gestão de Ativos & Equipamentos de TI ----------
+
+model ItAsset {
+  id             Int       @id @default(autoincrement())
+  assetTag       String    @unique
+  name           String
+  category       String    @default("NOTEBOOK") // NOTEBOOK | DESKTOP | MONITOR | IMPRESSORA | SERVIDOR | REDE | OUTRO
+  serialNumber   String?
+  assignedUser   String?
+  department     String?
+  status         String    @default("EM_USO") // EM_USO | DISPONIVEL | MANUTENCAO | BAIXADO
+  specifications String?
+  purchaseDate   DateTime?
+  notes          String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
 
 
