@@ -5,7 +5,7 @@ import { requireAdmin } from "@/lib/auth";
 export async function POST() {
   try {
     await requireAdmin();
-    const result = await runSystemAutomations();
+    const result = await runSystemAutomations({ forcePayroll: true });
     return NextResponse.json({ ok: true, result });
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : "Erro desconhecido";
@@ -15,7 +15,7 @@ export async function POST() {
 
 export async function GET() {
   try {
-    const result = await runSystemAutomations();
+    const result = await runSystemAutomations({ forcePayroll: true });
     return NextResponse.json({ ok: true, result });
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : "Erro desconhecido";

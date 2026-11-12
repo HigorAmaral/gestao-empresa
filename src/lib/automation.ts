@@ -9,6 +9,7 @@ export type AutomationResult = {
   sstExpiredFlagged: number;
   payrollProcessed: string | null;
   overdueTasksFlagged: number;
+  summary: string[];
 };
 
 /**
@@ -16,10 +17,10 @@ export type AutomationResult = {
  * 1. Projeção e lançamento automático de despesas recorrentes (Aluguel, Luz, Internet, Assinaturas);
  * 2. Análise inteligente de estoque mínimo e geração automática de pedidos de compra em rascunho;
  * 3. Varredura de vencimento de EPIs e ASOs de segurança do trabalho;
- * 4. Fechamento automático de Folha de Pagamento se estiver após o dia 25 do mês;
+ * 4. Fechamento automático de Folha de Pagamento do mês (caso ainda não gerada);
  * 5. Verificação e alerta de ordens de serviço atrasadas.
  */
-export async function runSystemAutomations(): Promise<AutomationResult> {
+export async function runSystemAutomations(options?: { forcePayroll?: boolean }): Promise<AutomationResult> {
   const now = new Date();
   const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
   const curY = now.getUTCFullYear();
@@ -167,7 +168,7 @@ export async function runSystemAutomations(): Promise<AutomationResult> {
     console.error("Erro na atualização de SST vencidos:", err);
   }
 
-  // 4. Automação de Folha de Pagamento do Mês Atual (se for a partir do dia 25 ou se não houver)
+  // 4. Automação de Folha de Pagamento do Mês Atual (se for >= dia 25 ou se forcePayroll for true)
   try {
     const payrollCount = await prisma.financialEntry.count({
       where: {
@@ -176,9 +177,14 @@ export async function runSystemAutomations(): Promise<AutomationResult> {
       },
     });
 
-    if (payrollCount === 0 && now.getUTCDate() >= 25) {
+    const shouldProcessPayroll = payrollCount === 0 && (options?.forcePayroll ?? true);
+    if (shouldProcessPayroll) {
       const res = await processPayrollForMonth(curMonth, { simulateRepIfEmpty: true });
-      payrollResultStr = `${res.employees} holerites gerados (Líquido: R$ ${res.totalNet.toFixed(2)})`;
+      if (res.employees > 0) {
+        payrollResultStr = `${res.employees} holerite(s) gerado(s) no Financeiro (Líquido Total: R$ ${res.totalNet.toLocaleString("pt-BR", { minimumFractionDigits: 2 })})`;
+      } else {
+        payrollResultStr = "Nenhum colaborador ativo cadastrado para folha";
+      }
     }
   } catch (err) {
     console.error("Erro no processamento automático de folha:", err);
@@ -196,6 +202,37 @@ export async function runSystemAutomations(): Promise<AutomationResult> {
     console.error("Erro ao verificar OS atrasadas:", err);
   }
 
+  // Montagem do resumo executivo das ações realizadas
+  const summary: string[] = [];
+
+  if (recurrentGenerated > 0) {
+    summary.push(`${recurrentGenerated} despesa(s) recorrente(s) fixas projetadas no Financeiro.`);
+  } else {
+    summary.push(`Despesas fixas recorrentes: todas as despesas deste mês (${curLabel}) já estavam lançadas.`);
+  }
+
+  if (lowStockOrders > 0) {
+    summary.push(`${lowStockOrders} pedido(s) de compra gerado(s) em rascunho para reposição de estoque crítico.`);
+  } else {
+    summary.push("Estoque crítico: nenhum novo produto necessitando de pedido de reposição.");
+  }
+
+  if (payrollResultStr) {
+    summary.push(`Folha de Pagamento ${curLabel}: ${payrollResultStr}.`);
+  } else {
+    summary.push(`Folha de Pagamento ${curLabel}: já está fechada e lançada no Financeiro.`);
+  }
+
+  if (sstFlagged > 0) {
+    summary.push(`${sstFlagged} item(ns) de EPI/ASO com prazo vencido atualizados no SST.`);
+  } else {
+    summary.push("Segurança do Trabalho (SST): todos os prazos verificados.");
+  }
+
+  if (overdueOsCount > 0) {
+    summary.push(`${overdueOsCount} Ordem(ns) de Serviço com prazo ultrapassado sinalizadas.`);
+  }
+
   revalidatePath("/", "layout");
   revalidatePath("/financeiro");
   revalidatePath("/compras");
@@ -209,5 +246,6 @@ export async function runSystemAutomations(): Promise<AutomationResult> {
     sstExpiredFlagged: sstFlagged,
     payrollProcessed: payrollResultStr,
     overdueTasksFlagged: overdueOsCount,
+    summary,
   };
 }
