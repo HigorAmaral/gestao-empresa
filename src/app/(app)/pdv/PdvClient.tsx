@@ -154,11 +154,16 @@ export function PdvClient({
       if (e.key === "F2") {
         e.preventDefault();
         searchInputRef.current?.focus();
+      } else if (e.key === "F4") {
+        e.preventDefault();
+        if (cart.length > 0 && !isPending) {
+          handleCheckout();
+        }
       }
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
+  }, [cart, isPending]);
 
   function addToCart(prod: PdvProduct) {
     setFeedback(null);
@@ -300,43 +305,43 @@ export function PdvClient({
   return (
     <div>
       {/* Barra de Controle de Turno / Gaveta de Caixa */}
-      <div className="card mb">
-        <div className="row between" style={{ flexWrap: "wrap", gap: 12 }}>
-          <div className="row" style={{ gap: 12, flexWrap: "wrap" }}>
+      <div className="card mb" style={{ padding: 0, overflow: "hidden" }}>
+        <div className="pdv-shift-bar">
+          <div className="pdv-shift-metrics">
             {activeSession ? (
               <>
-                <span className="badge success" style={{ fontSize: 13, padding: "6px 12px" }}>
+                <span className="badge success" style={{ fontSize: 12.5, padding: "6px 12px", display: "inline-flex", alignItems: "center", gap: 6, fontWeight: 700 }}>
                   <Unlock size={14} /> CAIXA #{activeSession.id} ABERTO ({activeSession.userName})
                 </span>
-                <div className="small">
+                <div className="pdv-metric-chip">
                   <span className="muted">Fundo Inicial:</span> <strong>{brl(activeSession.openingBalance)}</strong>
                 </div>
-                <div className="small">
+                <div className="pdv-metric-chip">
                   <span className="muted">Vendas no Turno ({activeSession.salesCount}):</span>{" "}
                   <strong>{brl(totalSessionSales)}</strong>
                 </div>
-                <div className="small">
-                  <span className="muted">Dinheiro na Gaveta:</span>{" "}
-                  <strong style={{ color: "var(--primary)" }}>{brl(expectedCashInDrawer)}</strong>
+                <div className="pdv-metric-chip">
+                  <span className="muted">Gaveta:</span>{" "}
+                  <strong style={{ color: "#10b981" }}>{brl(expectedCashInDrawer)}</strong>
                 </div>
               </>
             ) : (
-              <span className="badge warning" style={{ fontSize: 13, padding: "6px 12px" }}>
-                <Lock size={14} /> CAIXA FECHADO (Você ainda pode vender ou abrir o turno para controle de gaveta)
+              <span className="badge warning" style={{ fontSize: 13, padding: "6px 12px", display: "inline-flex", alignItems: "center", gap: 6 }}>
+                <Lock size={14} /> CAIXA FECHADO (Você pode abrir o turno para controle de gaveta ou vender direto)
               </span>
             )}
           </div>
 
-          <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
+          <div className="pdv-shift-actions">
             {!activeSession ? (
-              <button type="button" className="btn sm" onClick={() => setOpenModal(true)}>
-                <Unlock size={14} /> Abrir Caixa
+              <button type="button" className="pdv-btn-shift primary" onClick={() => setOpenModal(true)}>
+                <Unlock size={14} /> Abrir Turno de Caixa
               </button>
             ) : (
               <>
                 <button
                   type="button"
-                  className="btn sm secondary"
+                  className="pdv-btn-shift"
                   onClick={() => {
                     setMovModal("SUPRIMENTO");
                     setMovAmount("");
@@ -347,7 +352,7 @@ export function PdvClient({
                 </button>
                 <button
                   type="button"
-                  className="btn sm secondary"
+                  className="pdv-btn-shift"
                   onClick={() => {
                     setMovModal("SANGRIA");
                     setMovAmount("");
@@ -358,7 +363,7 @@ export function PdvClient({
                 </button>
                 <button
                   type="button"
-                  className="btn sm danger"
+                  className="pdv-btn-shift danger"
                   onClick={() => {
                     setClosingInput(expectedCashInDrawer.toFixed(2));
                     setCloseModal(true);
@@ -373,16 +378,16 @@ export function PdvClient({
       </div>
 
       {feedback && (
-        <div className={`alert ${feedback.type === "ok" ? "success" : "error"} mb row between`} style={{ flexWrap: "wrap" }}>
-          <span>
+        <div className={`alert ${feedback.type === "ok" ? "success" : "error"} mb row between`} style={{ flexWrap: "wrap", alignItems: "center", gap: 10 }}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontWeight: 500 }}>
             {feedback.type === "ok" && <CheckCircle2 size={16} className="icon-inline" />} {feedback.text}
           </span>
           {feedback.saleId && (
             <div className="row" style={{ gap: 8 }}>
-              <Link className="btn sm" href={`/vendas/${feedback.saleId}/recibo`}>
+              <Link className="btn sm" href={`/vendas/${feedback.saleId}/recibo`} style={{ height: 32, padding: "0 12px", fontSize: 12.5 }}>
                 <Printer size={14} /> Imprimir Cupom / Recibo
               </Link>
-              <Link className="btn sm secondary" href={`/vendas/${feedback.saleId}`}>
+              <Link className="btn sm secondary" href={`/vendas/${feedback.saleId}`} style={{ height: 32, padding: "0 12px", fontSize: 12.5 }}>
                 Ver Venda #{feedback.saleId}
               </Link>
             </div>
@@ -391,24 +396,24 @@ export function PdvClient({
       )}
 
       {/* Layout Principal do PDV: Catálogo à Esquerda + Carrinho/Caixa à Direita */}
-      <div className="grid grid-2" style={{ gridTemplateColumns: "1.35fr 1fr", alignItems: "start" }}>
+      <div className="grid grid-2" style={{ gridTemplateColumns: "1.35fr 1fr", alignItems: "start", gap: 16 }}>
         {/* Coluna Esquerda: Busca por Código de Barras + Produtos */}
         <div className="card">
-          <div className="row" style={{ gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
-            <div className="input-icon" style={{ flex: 1, minWidth: 200 }}>
-              <Search size={16} />
+          <div className="pdv-search-bar">
+            <div className="pdv-search-input">
+              <Search size={16} className="pdv-search-icon" />
               <input
                 ref={searchInputRef}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 onKeyDown={handleSearchKeyDown}
-                placeholder="Bipe o código de barras (SKU) e tecle Enter, ou busque pelo nome (F2)..."
+                placeholder="Bipe o código de barras (SKU) ou busque pelo nome... [F2]"
                 autoFocus
               />
             </div>
             <button
               type="button"
-              className="btn secondary"
+              className="pdv-btn-scan"
               onClick={() => setScannerOpen(true)}
               title="Ler Código de Barras pela Câmera"
             >
@@ -417,10 +422,10 @@ export function PdvClient({
           </div>
 
           {categories.length > 0 && (
-            <div className="period-pills mb" style={{ flexWrap: "wrap" }}>
+            <div className="pdv-category-list">
               <button
                 type="button"
-                className={`pill ${categoryFilter === "" ? "active" : ""}`}
+                className={`pdv-cat-pill ${categoryFilter === "" ? "active" : ""}`}
                 onClick={() => setCategoryFilter("")}
               >
                 Todos ({products.length})
@@ -429,7 +434,7 @@ export function PdvClient({
                 <button
                   key={cat}
                   type="button"
-                  className={`pill ${categoryFilter === cat ? "active" : ""}`}
+                  className={`pdv-cat-pill ${categoryFilter === cat ? "active" : ""}`}
                   onClick={() => setCategoryFilter(cat)}
                 >
                   {cat}
@@ -438,16 +443,7 @@ export function PdvClient({
             </div>
           )}
 
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(185px, 1fr))",
-              gap: 10,
-              maxHeight: 520,
-              overflowY: "auto",
-              paddingRight: 4,
-            }}
-          >
+          <div className="pdv-product-grid">
             {filteredProducts.map((p) => {
               const outOfStock = p.stock <= 0;
               return (
@@ -456,40 +452,28 @@ export function PdvClient({
                   type="button"
                   disabled={outOfStock}
                   onClick={() => addToCart(p)}
-                  style={{
-                    textAlign: "left",
-                    padding: "12px 14px",
-                    borderRadius: 10,
-                    border: "1px solid var(--border)",
-                    background: outOfStock ? "var(--surface-subtle)" : "var(--surface)",
-                    opacity: outOfStock ? 0.55 : 1,
-                    cursor: outOfStock ? "not-allowed" : "pointer",
-                    display: "flex",
-                    flexDirection: "column",
-                    justifyContent: "space-between",
-                    gap: 8,
-                    transition: "border-color 0.15s, transform 0.1s",
-                  }}
+                  className="pdv-product-card"
                 >
                   <div>
-                    <div className="row between" style={{ gap: 4 }}>
-                      <span className="small muted bold">{p.sku}</span>
-                      <span className={`badge ${outOfStock ? "danger" : "neutral"}`} style={{ fontSize: 10 }}>
-                        {p.stock} {p.unit}
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 4 }}>
+                      <span className="pdv-card-sku">{p.sku}</span>
+                      <span className={`badge ${outOfStock ? "danger" : "neutral"}`} style={{ fontSize: 10, padding: "2px 6px" }}>
+                        {outOfStock ? "Esgotado" : `${p.stock} ${p.unit}`}
                       </span>
                     </div>
-                    <div className="bold" style={{ fontSize: 13.5, marginTop: 4, lineHeight: 1.3 }}>
+                    <div className="pdv-card-name" title={p.name}>
                       {p.name}
                     </div>
                   </div>
-                  <div className="bold" style={{ fontSize: 15, color: "var(--text)" }}>
-                    {brl(p.salePrice)}
+                  <div className="pdv-card-bottom">
+                    <span className="pdv-card-price">{brl(p.salePrice)}</span>
+                    <span className="small muted" style={{ fontSize: 11, fontWeight: 600 }}>+ Adicionar</span>
                   </div>
                 </button>
               );
             })}
             {filteredProducts.length === 0 && (
-              <div className="empty" style={{ gridColumn: "1 / -1" }}>
+              <div className="empty" style={{ gridColumn: "1 / -1", padding: "40px 16px" }}>
                 Nenhum produto encontrado para &ldquo;{search}&rdquo;.
               </div>
             )}
@@ -498,19 +482,27 @@ export function PdvClient({
 
         {/* Coluna Direita: Cupom / Carrinho e Fechamento */}
         <div className="card">
-          <div className="card-header">
-            <h2>
-              <ShoppingCart size={17} /> Cupom de Venda ({cart.reduce((s, i) => s + i.quantity, 0)} itens)
+          <div className="card-header" style={{ marginBottom: 12 }}>
+            <h2 style={{ fontSize: 15, fontWeight: 700, display: "flex", alignItems: "center", gap: 8 }}>
+              <ShoppingCart size={17} /> Cupom de Venda
+              <span className="badge neutral" style={{ fontSize: 11, fontWeight: 700 }}>
+                {cart.reduce((s, i) => s + i.quantity, 0)} {cart.reduce((s, i) => s + i.quantity, 0) === 1 ? "item" : "itens"}
+              </span>
             </h2>
             {cart.length > 0 && (
-              <button type="button" className="btn sm ghost" onClick={() => setCart([])}>
-                <Trash2 size={14} /> Limpar
+              <button
+                type="button"
+                className="btn sm secondary"
+                style={{ height: 28, padding: "0 10px", fontSize: 12, display: "inline-flex", alignItems: "center", gap: 4 }}
+                onClick={() => setCart([])}
+              >
+                <Trash2 size={13} /> Limpar
               </button>
             )}
           </div>
 
           {cart.length === 0 ? (
-            <div className="empty" style={{ padding: "36px 16px" }}>
+            <div className="empty" style={{ padding: "44px 16px" }}>
               Bipe ou clique nos produtos ao lado para iniciar a venda rápida.
             </div>
           ) : (
@@ -536,34 +528,35 @@ export function PdvClient({
                         </div>
                       </td>
                       <td className="num">
-                        <div className="row" style={{ justifyContent: "flex-end", gap: 4 }}>
+                        <div className="pdv-qty-stepper" style={{ justifyContent: "flex-end" }}>
                           <button
                             type="button"
-                            className="btn sm secondary"
-                            style={{ padding: "3px 7px" }}
+                            className="pdv-btn-qty"
                             onClick={() => updateQty(item.product.id, item.quantity - 1)}
+                            title="Diminuir quantidade"
                           >
                             <Minus size={12} />
                           </button>
-                          <span className="bold" style={{ minWidth: 26, textAlign: "center" }}>
+                          <span className="pdv-qty-num">
                             {item.quantity}
                           </span>
                           <button
                             type="button"
-                            className="btn sm secondary"
-                            style={{ padding: "3px 7px" }}
+                            className="pdv-btn-qty"
                             onClick={() => updateQty(item.product.id, item.quantity + 1)}
+                            title="Aumentar quantidade"
                           >
                             <Plus size={12} />
                           </button>
                         </div>
                       </td>
-                      <td className="num bold">{brl(item.quantity * item.unitPrice)}</td>
+                      <td className="num bold" style={{ fontSize: 13.5 }}>{brl(item.quantity * item.unitPrice)}</td>
                       <td className="num">
                         <button
                           type="button"
-                          className="btn sm ghost"
+                          className="pdv-btn-del"
                           onClick={() => updateQty(item.product.id, 0)}
+                          title="Remover produto"
                         >
                           <X size={14} />
                         </button>
@@ -602,15 +595,15 @@ export function PdvClient({
 
             <div className="field s12">
               <div className="row between" style={{ marginBottom: 6 }}>
-                <label style={{ margin: 0 }}>Forma de Pagamento</label>
-                <label className="checkbox small" style={{ fontWeight: 500 }}>
+                <label style={{ margin: 0, fontWeight: 600 }}>Forma de Pagamento</label>
+                <label className="checkbox small" style={{ fontWeight: 500, cursor: "pointer" }}>
                   <input type="checkbox" checked={useSplit} onChange={(e) => setUseSplit(e.target.checked)} />
-                  <Split size={13} /> Dividir em 2 formas de pagamento
+                  <Split size={13} /> Dividir em 2 pagamentos
                 </label>
               </div>
 
               {!useSplit ? (
-                <div className="period-pills" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6 }}>
+                <div className="pdv-payment-grid">
                   {[
                     { id: "PIX", label: "PIX", Icon: QrCode },
                     { id: "Dinheiro", label: "Dinheiro", Icon: Banknote },
@@ -620,16 +613,15 @@ export function PdvClient({
                     <button
                       key={id}
                       type="button"
-                      className={`btn sm ${paymentMethod === id ? "" : "secondary"}`}
-                      style={{ justifyContent: "center" }}
+                      className={`pdv-payment-btn ${paymentMethod === id ? "active" : ""}`}
                       onClick={() => setPaymentMethod(id)}
                     >
-                      <Icon size={14} /> {label}
+                      <Icon size={15} /> {label}
                     </button>
                   ))}
                 </div>
               ) : (
-                <div className="form-grid" style={{ padding: 10, borderRadius: 8, background: "var(--surface-subtle)", border: "1px solid var(--border)" }}>
+                <div className="form-grid" style={{ padding: 12, borderRadius: 8, background: "var(--surface-subtle)", border: "1px solid var(--border)" }}>
                   <div className="field s6">
                     <label>1º Meio de Pagamento</label>
                     <select value={splitMethod1} onChange={(e) => setSplitMethod1(e.target.value)}>
@@ -669,29 +661,54 @@ export function PdvClient({
             {!useSplit && paymentMethod === "Dinheiro" && (
               <div className="field s12">
                 <div
-                  className="row between"
                   style={{
-                    padding: "10px 14px",
+                    padding: "12px 14px",
                     borderRadius: 8,
                     background: "var(--surface-subtle)",
                     border: "1px solid var(--border)",
-                    gap: 12,
-                    flexWrap: "wrap",
                   }}
                 >
-                  <div style={{ flex: 1, minWidth: 140 }}>
-                    <label className="small muted">Valor Recebido em Espécie (R$)</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      placeholder="Ex: 100.00"
-                      value={cashReceived}
-                      onChange={(e) => setCashReceived(e.target.value)}
-                    />
+                  <div className="row between" style={{ gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
+                    <div style={{ flex: 1, minWidth: 140 }}>
+                      <label className="small muted" style={{ display: "block", marginBottom: 4 }}>
+                        Valor Recebido em Espécie (R$)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        placeholder="Ex: 50,00"
+                        value={cashReceived}
+                        onChange={(e) => setCashReceived(e.target.value)}
+                        style={{ height: 38, fontSize: 15, fontWeight: 700 }}
+                      />
+                    </div>
+                    <div style={{ textAlign: "right" }}>
+                      <div className="small muted" style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.05em" }}>TROCO A DEVOLVER</div>
+                      <div style={{ fontSize: 24, fontWeight: 900, color: changeAmount > 0 ? "#10b981" : "var(--text)", marginTop: 2 }}>
+                        {brl(changeAmount)}
+                      </div>
+                    </div>
                   </div>
-                  <div style={{ textAlign: "right" }}>
-                    <div className="small muted">TROCO A DEVOLVER</div>
-                    <div style={{ fontSize: 22, fontWeight: 800 }}>{brl(changeAmount)}</div>
+
+                  <div className="pdv-cash-presets">
+                    <span className="small muted bold" style={{ marginRight: 2 }}>Atalhos:</span>
+                    <button
+                      type="button"
+                      className="pdv-btn-preset"
+                      onClick={() => setCashReceived(total.toFixed(2))}
+                    >
+                      Exato ({brl(total)})
+                    </button>
+                    {[20, 50, 100, 200].map((v) => (
+                      <button
+                        key={v}
+                        type="button"
+                        className="pdv-btn-preset"
+                        onClick={() => setCashReceived(String(v))}
+                      >
+                        R$ {v}
+                      </button>
+                    ))}
                   </div>
                 </div>
               </div>
@@ -702,38 +719,31 @@ export function PdvClient({
           <div
             style={{
               marginTop: 16,
-              padding: "14px 16px",
+              padding: "16px 18px",
               borderRadius: 10,
-              background: "var(--primary)",
-              color: "var(--primary-fg)",
+              background: "#09090b",
+              border: "1px solid #27272a",
+              color: "#ffffff",
             }}
           >
-            <div className="row between small" style={{ opacity: 0.85 }}>
+            <div className="row between small" style={{ color: "#a1a1aa", marginBottom: 6 }}>
               <span>Subtotal: {brl(subtotal)}</span>
-              <span>Desconto: -{brl(discountVal)}</span>
+              {discountVal > 0 && <span style={{ color: "#ef4444" }}>Desconto: -{brl(discountVal)}</span>}
             </div>
-            <div className="row between" style={{ marginTop: 6 }}>
-              <span style={{ fontSize: 15, fontWeight: 600 }}>TOTAL A PAGAR</span>
-              <span style={{ fontSize: 26, fontWeight: 800 }}>{brl(total)}</span>
+            <div className="row between" style={{ alignItems: "baseline" }}>
+              <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.05em", color: "#a1a1aa" }}>TOTAL A PAGAR</span>
+              <span style={{ fontSize: 28, fontWeight: 900, color: "#ffffff", letterSpacing: "-0.5px" }}>{brl(total)}</span>
             </div>
           </div>
 
           <button
             type="button"
-            className="btn"
+            className="pdv-btn-checkout"
             disabled={cart.length === 0 || isPending}
             onClick={handleCheckout}
-            style={{
-              width: "100%",
-              marginTop: 12,
-              padding: "13px 18px",
-              fontSize: 15,
-              fontWeight: 700,
-              justifyContent: "center",
-            }}
           >
             <CheckCircle2 size={18} />
-            {isPending ? "Processando Venda..." : "Finalizar Venda Rápida (Baixar Estoque + Recibo)"}
+            {isPending ? "Processando Venda..." : "Finalizar Venda Rápida (F4)"}
           </button>
         </div>
       </div>
@@ -810,11 +820,21 @@ export function PdvClient({
                   autoFocus
                 />
               </div>
-              <div className="form-actions mt">
-                <button type="button" className="btn secondary" onClick={() => setOpenModal(false)}>
+              <div className="form-actions mt" style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                <button
+                  type="button"
+                  className="btn secondary"
+                  style={{ height: 38, padding: "0 18px", fontSize: 13.5 }}
+                  onClick={() => setOpenModal(false)}
+                >
                   Cancelar
                 </button>
-                <button type="submit" className="btn" disabled={isPending}>
+                <button
+                  type="submit"
+                  className="btn"
+                  style={{ height: 38, padding: "0 20px", fontSize: 13.5, fontWeight: 700 }}
+                  disabled={isPending}
+                >
                   Confirmar Abertura
                 </button>
               </div>
@@ -859,11 +879,21 @@ export function PdvClient({
                   />
                 </div>
               </div>
-              <div className="form-actions mt">
-                <button type="button" className="btn secondary" onClick={() => setMovModal(null)}>
+              <div className="form-actions mt" style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                <button
+                  type="button"
+                  className="btn secondary"
+                  style={{ height: 38, padding: "0 18px", fontSize: 13.5 }}
+                  onClick={() => setMovModal(null)}
+                >
                   Cancelar
                 </button>
-                <button type="submit" className="btn" disabled={isPending}>
+                <button
+                  type="submit"
+                  className="btn"
+                  style={{ height: 38, padding: "0 20px", fontSize: 13.5, fontWeight: 700 }}
+                  disabled={isPending}
+                >
                   Confirmar {movModal}
                 </button>
               </div>
@@ -931,11 +961,21 @@ export function PdvClient({
                   />
                 </div>
               </div>
-              <div className="form-actions mt">
-                <button type="button" className="btn secondary" onClick={() => setCloseModal(false)}>
+              <div className="form-actions mt" style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                <button
+                  type="button"
+                  className="btn secondary"
+                  style={{ height: 38, padding: "0 18px", fontSize: 13.5 }}
+                  onClick={() => setCloseModal(false)}
+                >
                   Cancelar
                 </button>
-                <button type="submit" className="btn danger" disabled={isPending}>
+                <button
+                  type="submit"
+                  className="btn danger"
+                  style={{ height: 38, padding: "0 20px", fontSize: 13.5, fontWeight: 700 }}
+                  disabled={isPending}
+                >
                   Encerrar Turno de Caixa
                 </button>
               </div>
