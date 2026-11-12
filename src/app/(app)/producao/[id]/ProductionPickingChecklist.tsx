@@ -81,7 +81,7 @@ export function ProductionPickingChecklist({
   }
 
   return (
-    <div className="card table-responsive">
+    <div className="card">
       <div
         style={{
           padding: "4px 0 14px",
@@ -143,7 +143,8 @@ export function ProductionPickingChecklist({
         </div>
       )}
 
-      <table>
+      <div className="table-responsive">
+        <table>
         <thead>
           <tr>
             <th style={{ width: 44, textAlign: "center" }}>Check</th>
@@ -234,6 +235,7 @@ export function ProductionPickingChecklist({
           })}
         </tbody>
       </table>
+      </div>
 
       {/* Leitor de código de barras para bipagem rápida na separação */}
       <BarcodeScannerModal

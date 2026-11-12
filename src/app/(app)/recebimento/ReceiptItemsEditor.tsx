@@ -145,7 +145,7 @@ export function ReceiptItemsEditor({
         <select
           value={selectedProductId}
           onChange={(e) => setSelectedProductId(e.target.value)}
-          style={{ flex: 1, minWidth: 260 }}
+          style={{ flex: 1, minWidth: "min(100%, 260px)" }}
         >
           <option value="">Selecione o produto ou matéria-prima para adicionar...</option>
           {products.map((p) => (

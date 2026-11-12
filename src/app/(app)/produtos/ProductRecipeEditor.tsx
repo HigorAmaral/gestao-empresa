@@ -107,7 +107,7 @@ export function ProductRecipeEditor({
           <select
             value={selectedComponentId}
             onChange={(e) => setSelectedComponentId(e.target.value)}
-            style={{ flex: 1, minWidth: 260 }}
+            style={{ flex: 1, minWidth: "min(100%, 260px)" }}
           >
             <option value="">Selecione um insumo para adicionar à composição...</option>
             {availableProducts

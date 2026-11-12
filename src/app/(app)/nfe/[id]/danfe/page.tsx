@@ -131,7 +131,9 @@ export default async function DanfePrintPage({
         </div>
       </div>
 
-      <DanfeDocument data={danfeData} />
+      <div className="danfe-page-container table-responsive" style={{ padding: "0 0 20px", display: "flex", justifyContent: "center" }}>
+        <DanfeDocument data={danfeData} />
+      </div>
     </>
   );
 }

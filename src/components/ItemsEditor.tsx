@@ -67,7 +67,7 @@ export function ItemsEditor({
 
       {!readOnly && (
         <div className="row mb">
-          <select value={selected} onChange={(e) => setSelected(e.target.value)} style={{ flex: 1 }}>
+          <select value={selected} onChange={(e) => setSelected(e.target.value)} style={{ flex: 1, minWidth: "min(100%, 260px)" }}>
             <option value="">
               {allowEmpty ? "Adicionar peça / produto utilizado (opcional)..." : "Selecione um produto para adicionar..."}
             </option>

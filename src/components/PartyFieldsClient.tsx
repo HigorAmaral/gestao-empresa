@@ -88,19 +88,20 @@ export function PartyFieldsClient({ data }: { data?: PartyLike | null }) {
 
       <div className="field s5">
         <label>CPF / CNPJ</label>
-        <div className="row" style={{ gap: 6, flexWrap: "nowrap" }}>
+        <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
           <input
             name="document"
             value={document}
             onChange={(e) => setDocument(e.target.value)}
             placeholder="Digite o CPF ou CNPJ..."
+            style={{ flex: 1, minWidth: 160 }}
           />
           <button
             type="button"
             className="btn sm secondary"
             onClick={lookupCnpj}
             disabled={loadingCnpj}
-            style={{ whiteSpace: "nowrap", padding: "8px 11px" }}
+            style={{ whiteSpace: "nowrap", padding: "8px 11px", flexShrink: 0 }}
             title="Buscar dados do CNPJ automaticamente"
           >
             {loadingCnpj ? <Loader2 size={14} className="spin-icon" /> : <Search size={14} />} Buscar CNPJ
@@ -125,19 +126,20 @@ export function PartyFieldsClient({ data }: { data?: PartyLike | null }) {
 
       <div className="field s4">
         <label>Buscar Endereço por CEP</label>
-        <div className="row" style={{ gap: 6, flexWrap: "nowrap" }}>
+        <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
           <input
             value={zipSearch}
             onChange={(e) => setZipSearch(e.target.value)}
             placeholder="00000-000"
             maxLength={9}
+            style={{ flex: 1, minWidth: 120 }}
           />
           <button
             type="button"
             className="btn sm secondary"
             onClick={lookupCep}
             disabled={loadingCep}
-            style={{ whiteSpace: "nowrap", padding: "8px 11px" }}
+            style={{ whiteSpace: "nowrap", padding: "8px 11px", flexShrink: 0 }}
           >
             {loadingCep ? <Loader2 size={14} className="spin-icon" /> : <Search size={14} />} CEP
           </button>

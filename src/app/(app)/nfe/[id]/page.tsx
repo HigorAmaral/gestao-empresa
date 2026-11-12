@@ -141,7 +141,7 @@ export default async function InvoiceDetailPage({
               <div style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase" }}>
                 Chave de Acesso Oficial (44 Dígitos)
               </div>
-              <div style={{ fontSize: 16, fontWeight: 900, fontFamily: "monospace", letterSpacing: 1, marginTop: 4 }}>
+              <div style={{ fontSize: 16, fontWeight: 900, fontFamily: "monospace", letterSpacing: 1, marginTop: 4, wordBreak: "break-all", lineHeight: 1.4 }}>
                 {formattedKey}
               </div>
             </div>

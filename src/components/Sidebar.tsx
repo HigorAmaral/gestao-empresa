@@ -17,6 +17,7 @@ import {
   Package,
   PackageCheck,
   Receipt,
+  Search,
   Settings,
   ShieldCheck,
   ShoppingCart,
@@ -156,8 +157,8 @@ export function Sidebar({
               src={logoUrl}
               alt={brandName}
               style={{
-                width: 36,
-                height: 36,
+                width: 34,
+                height: 34,
                 borderRadius: 8,
                 background: "#ffffff",
                 objectFit: "contain",
@@ -166,18 +167,34 @@ export function Sidebar({
               }}
             />
           ) : (
-            <div className="logo" style={{ width: 36, height: 36 }}>
+            <div className="logo" style={{ width: 34, height: 34 }}>
               <Building2 size={18} strokeWidth={2.2} />
             </div>
           )}
-          <span>{brandName}</span>
+          <span style={{ maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {brandName}
+          </span>
         </div>
-        <div className="row" style={{ gap: 8 }}>
+        <div className="row" style={{ gap: 6 }}>
+          <button
+            type="button"
+            className="theme-btn"
+            onClick={() => {
+              if (typeof window !== "undefined") {
+                window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true }));
+              }
+            }}
+            title="Buscar (Ctrl+K)"
+            aria-label="Pesquisar"
+          >
+            <Search size={15} />
+          </button>
           <button
             type="button"
             className="theme-btn"
             onClick={toggleTheme}
             title={dark ? "Modo claro" : "Modo escuro"}
+            aria-label="Alternar tema claro/escuro"
           >
             {dark ? <Sun size={15} /> : <Moon size={15} />}
           </button>
@@ -185,7 +202,7 @@ export function Sidebar({
             type="button"
             className="theme-btn"
             onClick={() => setDrawerOpen((v) => !v)}
-            aria-label="Abrir menu"
+            aria-label={drawerOpen ? "Fechar menu" : "Abrir menu"}
           >
             {drawerOpen ? <X size={17} /> : <Menu size={17} />}
           </button>
@@ -217,7 +234,9 @@ export function Sidebar({
                 <Building2 size={20} strokeWidth={2.2} />
               </div>
             )}
-            <span style={{ fontSize: 16.5 }}>{brandName}</span>
+            <span style={{ fontSize: 16.5, maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {brandName}
+            </span>
           </div>
           <div className="row" style={{ gap: 6 }}>
             <button
@@ -228,6 +247,15 @@ export function Sidebar({
             >
               {dark ? <Sun size={15} /> : <Moon size={15} />}
             </button>
+            <button
+              type="button"
+              className="theme-btn mobile-close-btn"
+              onClick={() => setDrawerOpen(false)}
+              aria-label="Fechar menu"
+              title="Fechar menu lateral"
+            >
+              <X size={16} />
+            </button>
           </div>
         </div>
 
@@ -236,7 +264,11 @@ export function Sidebar({
           <GlobalSearch />
         </div>
 
-        <nav>
+        <nav onClick={(e) => {
+          if ((e.target as HTMLElement).closest("a")) {
+            setDrawerOpen(false);
+          }
+        }}>
           {SECTIONS.map((section) => {
             const items = section.items.filter((i) => !i.moduleKey || hasModuleAccess(session, i.moduleKey));
             if (items.length === 0) return null;
@@ -250,7 +282,6 @@ export function Sidebar({
                       key={href}
                       href={href}
                       className={`${isActive(href) ? "active" : ""} ${subItem ? "sidebar-subitem" : ""}`}
-                      style={subItem ? { paddingLeft: 24, fontSize: 13, gap: 8 } : undefined}
                     >
                       <Icon size={subItem ? 14 : 17} strokeWidth={2} />
                       <span style={{ flex: 1 }}>{label}</span>

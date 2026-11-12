@@ -86,7 +86,7 @@ export function ProductionItemsEditor({
         <select
           value={selectedProductId}
           onChange={(e) => setSelectedProductId(e.target.value)}
-          style={{ flex: 1, minWidth: 260 }}
+          style={{ flex: 1, minWidth: "min(100%, 260px)" }}
         >
           <option value="">Selecione uma matéria-prima / insumo para adicionar à lista...</option>
           {products.map((p) => (

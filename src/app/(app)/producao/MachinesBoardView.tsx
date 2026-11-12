@@ -213,7 +213,7 @@ export function MachinesBoardView({
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 300px), 1fr))",
           gap: 16,
         }}
       >
@@ -475,6 +475,8 @@ export function MachinesBoardView({
               borderRadius: 12,
               width: "100%",
               maxWidth: 450,
+              maxHeight: "92vh",
+              overflowY: "auto",
               padding: 22,
             }}
             onClick={(e) => e.stopPropagation()}

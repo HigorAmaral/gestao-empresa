@@ -298,7 +298,7 @@ export function ProductionOrderForm({
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+            gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 250px), 1fr))",
             gap: 16,
             marginBottom: 20,
           }}
@@ -500,7 +500,7 @@ export function ProductionOrderForm({
             <select
               value={manualAddId}
               onChange={(e) => setManualAddId(e.target.value)}
-              style={{ flex: 1, minWidth: 260, padding: "8px 12px" }}
+              style={{ flex: 1, minWidth: "min(100%, 240px)", padding: "8px 12px" }}
             >
               <option value="">Adicionar matéria-prima avulsa à lista...</option>
               {products.map((p) => (
