@@ -9,6 +9,7 @@ import {
   Check,
   CheckCircle2,
   CreditCard,
+  Package,
   Plus,
   Target,
   TrendingUp,
@@ -679,17 +680,19 @@ export default async function DashboardPage({ searchParams }: { searchParams: SP
       </div>
 
       {/* 6. Divisão por Forma de Pagamento, Top Clientes e Top Produtos */}
-      <div className="grid grid-3 mt">
-        <div className="card">
+      <div className="grid grid-3 mt dashboard-rank-grid">
+        <div className="card dashboard-rank-card">
           <div className="card-header">
             <h2>
               <CreditCard size={16} /> Formas de pagamento ({period.label})
             </h2>
           </div>
-          <HBarList rows={paymentRows} format={(v) => brl(v)} />
+          <div className="dashboard-rank-content">
+            <HBarList rows={paymentRows} format={(v) => brl(v)} />
+          </div>
         </div>
 
-        <div className="card">
+        <div className="card dashboard-rank-card">
           <div className="card-header">
             <h2>
               <Users size={16} /> Top clientes ({period.label})
@@ -698,23 +701,29 @@ export default async function DashboardPage({ searchParams }: { searchParams: SP
               clientes <ArrowRight size={13} />
             </Link>
           </div>
-          <HBarList rows={topClientRows} format={(v) => brl(v)} />
+          <div className="dashboard-rank-content">
+            <HBarList rows={topClientRows} format={(v) => brl(v)} />
+          </div>
         </div>
 
-        <div className="card">
+        <div className="card dashboard-rank-card">
           <div className="card-header">
-            <h2>Top 5 produtos ({period.label})</h2>
+            <h2>
+              <Package size={16} /> Top 5 produtos ({period.label})
+            </h2>
             <Link className="small row" style={{ gap: 4 }} href="/relatorios">
               relatórios <ArrowRight size={13} />
             </Link>
           </div>
-          <HBarList
-            rows={topItems.map((t) => ({
-              name: prodById.get(t.productId)?.name ?? `Produto #${t.productId}`,
-              value: t._sum.total ?? 0,
-            }))}
-            format={(v) => brl(v)}
-          />
+          <div className="dashboard-rank-content">
+            <HBarList
+              rows={topItems.map((t) => ({
+                name: prodById.get(t.productId)?.name ?? `Produto #${t.productId}`,
+                value: t._sum.total ?? 0,
+              }))}
+              format={(v) => brl(v)}
+            />
+          </div>
         </div>
       </div>
 

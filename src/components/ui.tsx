@@ -192,7 +192,7 @@ export function HBarList({
   const max = Math.max(1, ...rows.map((r) => r.value));
   if (rows.length === 0) return <div className="empty">Sem dados no período.</div>;
   return (
-    <div>
+    <div className="hbar-list">
       {rows.map((r, i) => (
         <div className="hbar" key={r.name + i}>
           <div className="name" title={r.name}>

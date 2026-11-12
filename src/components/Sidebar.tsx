@@ -6,7 +6,6 @@ import { useEffect, useState } from "react";
 import {
   BarChart3,
   Building2,
-  ChevronLeft,
   ChevronRight,
   Factory,
   FileText,
@@ -292,17 +291,6 @@ export function Sidebar({
             </button>
           </div>
         </div>
-
-        {/* Botão de seta retrátil no meio da lateral da barra quando aberta */}
-        <button
-          type="button"
-          className="sidebar-edge-toggle no-print"
-          onClick={handleCollapse}
-          title="Recolher menu lateral"
-          aria-label="Recolher menu lateral"
-        >
-          <ChevronLeft size={15} strokeWidth={2.4} />
-        </button>
 
         {/* Busca Global Instantânea (Ctrl + K) */}
         <div style={{ padding: "10px 12px 2px" }}>
